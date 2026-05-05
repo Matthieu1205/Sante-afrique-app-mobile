@@ -5,9 +5,9 @@ import { Colors } from '@/theme';
 
 const { dark: _dark, ...lightBase } = Colors;
 
-export type ThemeColors = typeof lightBase;
+export type ThemeColors = { [K in keyof typeof lightBase]: string };
 
-const lightColors: ThemeColors = lightBase;
+const lightColors: ThemeColors = lightBase as ThemeColors;
 
 const darkColors: ThemeColors = {
   ...lightBase,
@@ -34,22 +34,34 @@ const darkColors: ThemeColors = {
   infoLight:        '#061527',
 };
 
+// ─── Taille du texte ──────────────────────────────────────────────
+
+export type TextSize = 'small' | 'medium' | 'large';
+const FONT_SCALES: Record<TextSize, number> = { small: 0.85, medium: 1.0, large: 1.18 };
+
 // ─── Context ──────────────────────────────────────────────────────
 
 interface ThemeContextValue {
   isDark: boolean;
   toggleTheme: () => void;
   colors: ThemeColors;
+  textSize: TextSize;
+  setTextSize: (size: TextSize) => void;
+  fontScale: number;
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
   isDark: false,
   toggleTheme: () => {},
   colors: lightColors,
+  textSize: 'medium',
+  setTextSize: () => {},
+  fontScale: 1.0,
 });
 
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isDark, setIsDark] = useState(false);
+  const [textSize, setTextSize] = useState<TextSize>('medium');
 
   return (
     <ThemeContext.Provider
@@ -57,6 +69,9 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         isDark,
         toggleTheme: () => setIsDark((v) => !v),
         colors: isDark ? darkColors : lightColors,
+        textSize,
+        setTextSize,
+        fontScale: FONT_SCALES[textSize],
       }}
     >
       {children}

@@ -157,8 +157,8 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
   switchText: { flex: 1 },
   textSizeGroup: { flexDirection: 'row', gap: Spacing['2'] },
   textSizeBtn: {
-    width: 32,
-    height: 32,
+    width: 38,
+    height: 38,
     borderRadius: Radius.sm,
     borderWidth: 1,
     borderColor: C.border,
@@ -167,8 +167,19 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     backgroundColor: C.background,
   },
   textSizeBtnActive: { borderColor: C.primary, backgroundColor: C.primaryUltraLight },
-  textSizeLabel: { fontFamily: FontFamily.body, color: C.textMuted },
+  textSizeLabel: { fontFamily: FontFamily.bodySemiBold, color: C.textMuted },
   textSizeLabelActive: { color: C.primary },
+  textSizePreview: {
+    paddingHorizontal: Spacing['4'],
+    paddingVertical: Spacing['3'],
+    borderTopWidth: 1,
+    borderTopColor: C.borderLight,
+  },
+  textSizePreviewText: {
+    fontFamily: FontFamily.body,
+    color: C.textSecondary,
+    lineHeight: 22,
+  },
 });
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
@@ -177,7 +188,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onToggleDark,
 }) => {
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, textSize, setTextSize, fontScale } = useTheme();
   const styles = makeStyles(colors);
 
   const [selectedCountry, setSelectedCountry] = useState('ci');
@@ -185,7 +196,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     new Set(['actualites', 'dossiers', 'vaccination'])
   );
   const [notifEnabled, setNotifEnabled] = useState(true);
-  const [textSize, setTextSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [showCountryPicker, setShowCountryPicker] = useState(false);
 
   const toggleTopic = (id: string) =>
@@ -308,23 +318,37 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               thumbColor={isDark ? colors.primary : colors.white}
             />
           </View>
-          <View style={[styles.switchRow, { borderBottomWidth: 0 }]}>
+          <View style={styles.switchRow}>
             <View style={styles.switchText}>
               <Text style={styles.rowLabel}>Taille du texte</Text>
             </View>
             <View style={styles.textSizeGroup}>
-              {(['small', 'medium', 'large'] as const).map((size) => (
+              {([
+                { size: 'small',  label: 'A', fontSize: 12 },
+                { size: 'medium', label: 'A', fontSize: 16 },
+                { size: 'large',  label: 'A', fontSize: 21 },
+              ] as const).map(({ size, label, fontSize }) => (
                 <TouchableOpacity
                   key={size}
                   style={[styles.textSizeBtn, textSize === size && styles.textSizeBtnActive]}
                   onPress={() => setTextSize(size)}
+                  activeOpacity={0.7}
                 >
-                  <Text style={[styles.textSizeLabel, textSize === size && styles.textSizeLabelActive]}>
-                    {size === 'small' ? 'A' : size === 'medium' ? 'A' : 'A'}
+                  <Text style={[
+                    styles.textSizeLabel,
+                    { fontSize },
+                    textSize === size && styles.textSizeLabelActive,
+                  ]}>
+                    {label}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
+          <View style={styles.textSizePreview}>
+            <Text style={[styles.textSizePreviewText, { fontSize: 14 * fontScale }]}>
+              Aperçu · La santé en Afrique commence par l'accès à l'information.
+            </Text>
           </View>
         </View>
 

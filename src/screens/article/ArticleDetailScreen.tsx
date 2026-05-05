@@ -105,7 +105,7 @@ interface ArticleDetailScreenProps {
   onArticlePress?: (articleId: string) => void;
 }
 
-const makeStyles = (C: ThemeColors) => StyleSheet.create({
+const makeStyles = (C: ThemeColors, fontScale = 1) => StyleSheet.create({
   container: { flex: 1, backgroundColor: C.backgroundCard },
   navBar: {
     position: "absolute",
@@ -141,7 +141,7 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
   authorAvatarText: { fontFamily: FontFamily.headingBold, fontSize: FontSize.base, color: C.primary },
   authorName: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.base, color: C.textSecondary },
   separator: { height: 1, backgroundColor: C.borderLight, marginVertical: Spacing["2"] },
-  paragraph: { fontFamily: FontFamily.body, fontSize: FontSize.md, color: C.textSecondary, lineHeight: FontSize.md * 1.7 },
+  paragraph: { fontFamily: FontFamily.body, fontSize: FontSize.md * fontScale, color: C.textSecondary, lineHeight: FontSize.md * fontScale * 1.7 },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: Spacing["2"], paddingBottom: Spacing["2"] },
   tag: { backgroundColor: C.background, borderRadius: Radius.sm, paddingHorizontal: Spacing["2"], paddingVertical: 4, borderWidth: 1, borderColor: C.border },
   tagText: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textMuted },
@@ -155,8 +155,8 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
   onShare,
   onArticlePress,
 }) => {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
+  const { colors, fontScale } = useTheme();
+  const styles = makeStyles(colors, fontScale);
   const [bookmarked, setBookmarked] = useState(false);
 
   return (
