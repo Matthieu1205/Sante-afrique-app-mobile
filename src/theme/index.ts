@@ -6,7 +6,7 @@
 
 export { Colors } from './colors';
 export type { ColorKeys } from './colors';
-export { FontFamily, FontSize, LineHeight, TextStyles } from './typography';
+export { FontFamily, FontSize, LineHeight, TextStyles, setGlobalFontScale } from './typography';
 export { Spacing, Radius, Layout, Breakpoints } from './spacing';
 export { Shadows } from './shadows';
 

@@ -28,18 +28,26 @@ export const FontFamily = {
 } as const;
 
 // ─── TAILLES DE POLICE ───────────────────────────────────────────
-export const FontSize = {
-  xs: 10,
-  sm: 12,
-  base: 14,
-  md: 16,
-  lg: 18,
-  xl: 20,
-  '2xl': 22,
-  '3xl': 26,
-  '4xl': 30,
-  '5xl': 36,
-} as const;
+// _fontScale est mis à jour par ThemeContext — tous les composants
+// qui lisent FontSize.xxx reçoivent automatiquement la valeur scalée
+// lors de leur prochain rendu (déclenché par le changement de contexte).
+let _fontScale = 1;
+export const setGlobalFontScale = (scale: number) => { _fontScale = scale; };
+
+const BASE = { xs: 10, sm: 12, base: 14, md: 16, lg: 18, xl: 20, '2xl': 22, '3xl': 26, '4xl': 30, '5xl': 36 };
+
+export const FontSize: typeof BASE = {
+  get xs()    { return BASE.xs    * _fontScale; },
+  get sm()    { return BASE.sm    * _fontScale; },
+  get base()  { return BASE.base  * _fontScale; },
+  get md()    { return BASE.md    * _fontScale; },
+  get lg()    { return BASE.lg    * _fontScale; },
+  get xl()    { return BASE.xl    * _fontScale; },
+  get ['2xl']() { return BASE['2xl'] * _fontScale; },
+  get ['3xl']() { return BASE['3xl'] * _fontScale; },
+  get ['4xl']() { return BASE['4xl'] * _fontScale; },
+  get ['5xl']() { return BASE['5xl'] * _fontScale; },
+};
 
 // ─── HAUTEURS DE LIGNE ───────────────────────────────────────────
 export const LineHeight = {

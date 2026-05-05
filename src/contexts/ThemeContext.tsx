@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Colors } from '@/theme';
+import { Colors, setGlobalFontScale } from '@/theme';
 
 // ─── Palette claire (défaut) ───────────────────────────────────────
 
@@ -63,6 +63,11 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [isDark, setIsDark] = useState(false);
   const [textSize, setTextSize] = useState<TextSize>('medium');
 
+  const handleSetTextSize = (size: TextSize) => {
+    setGlobalFontScale(FONT_SCALES[size]);
+    setTextSize(size);
+  };
+
   return (
     <ThemeContext.Provider
       value={{
@@ -70,7 +75,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         toggleTheme: () => setIsDark((v) => !v),
         colors: isDark ? darkColors : lightColors,
         textSize,
-        setTextSize,
+        setTextSize: handleSetTextSize,
         fontScale: FONT_SCALES[textSize],
       }}
     >
