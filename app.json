@@ -16,6 +16,7 @@
       "bundleIdentifier": "net.santeafrique.app"
     },
     "android": {
+      "icon": "./src/assets/icon-blue.png",
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/logo2.png",
         "backgroundColor": "#1B9DD9"
