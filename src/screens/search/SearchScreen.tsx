@@ -13,7 +13,9 @@ import {
 import { ArticleCard } from '@/components/common';
 import type { Article } from '@/components/common';
 import { Feather } from '@expo/vector-icons';
-import { Colors, FontFamily, FontSize, Spacing, Radius } from '@/theme';
+import { FontFamily, FontSize, Spacing, Radius } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { ThemeColors } from '@/contexts/ThemeContext';
 
 // ─── Données mock pour la recherche ──────────────────────────────
 
@@ -36,16 +38,13 @@ const ALL_ARTICLES: Article[] = [
 ];
 
 const RECENT_SEARCHES_INITIAL = ['paludisme', 'santé maternelle', 'nutrition infantile'];
-
 const SUGGESTIONS = ['paludisme', 'vaccination', 'maternité', 'nutrition', 'OMS', 'diabète', 'cancer', 'mental'];
 
 function searchArticles(query: string, articles: Article[]): Article[] {
   const q = query.toLowerCase().trim();
   if (!q) return [];
   return articles.filter(
-    (a) =>
-      a.title.toLowerCase().includes(q) ||
-      a.category.toLowerCase().includes(q),
+    (a) => a.title.toLowerCase().includes(q) || a.category.toLowerCase().includes(q),
   );
 }
 
@@ -54,10 +53,128 @@ interface SearchScreenProps {
   onBack: () => void;
 }
 
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.background },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.backgroundCard,
+    paddingTop: Platform.OS === 'ios' ? 56 : 36,
+    paddingBottom: Spacing['3'],
+    paddingHorizontal: Spacing['4'],
+    gap: Spacing['3'],
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderLight,
+  },
+  inputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.background,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing['3'],
+    gap: Spacing['2'],
+    height: 44,
+  },
+  input: {
+    flex: 1,
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    color: C.textPrimary,
+    padding: 0,
+  },
+  resultsCount: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: C.textMuted,
+    paddingHorizontal: Spacing['4'],
+    paddingVertical: Spacing['3'],
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing['3'],
+    paddingHorizontal: Spacing['8'],
+  },
+  emptyEmoji: { fontSize: 48 },
+  emptyTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.xl,
+    color: C.textPrimary,
+  },
+  emptyText: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    color: C.textMuted,
+    textAlign: 'center',
+    lineHeight: FontSize.base * 1.55,
+  },
+  section: {
+    paddingHorizontal: Spacing['4'],
+    paddingTop: Spacing['5'],
+    gap: Spacing['3'],
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sectionTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.base,
+    color: C.textPrimary,
+  },
+  clearAll: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: C.primary,
+  },
+  recentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing['3'],
+    paddingVertical: Spacing['2'],
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderLight,
+  },
+  recentText: {
+    flex: 1,
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    color: C.textPrimary,
+  },
+  recentRemove: {
+    fontSize: 12,
+    color: C.textDisabled,
+  },
+  suggestionsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing['2'],
+  },
+  suggestionChip: {
+    backgroundColor: C.backgroundCard,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing['3'],
+    paddingVertical: Spacing['2'],
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  suggestionText: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: FontSize.sm,
+    color: C.textSecondary,
+  },
+});
+
 export const SearchScreen: React.FC<SearchScreenProps> = ({
   onArticlePress,
   onBack,
 }) => {
+  const { colors, isDark } = useTheme();
+  const styles = makeStyles(colors);
+
   const [query, setQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>(RECENT_SEARCHES_INITIAL);
   const inputRef = useRef<TextInput>(null);
@@ -67,9 +184,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
   const handleSubmit = useCallback(() => {
     const q = query.trim();
     if (!q) return;
-    setRecentSearches((prev) =>
-      [q, ...prev.filter((s) => s !== q)].slice(0, 6),
-    );
+    setRecentSearches((prev) => [q, ...prev.filter((s) => s !== q)].slice(0, 6));
   }, [query]);
 
   const handleRecentPress = useCallback((term: string) => {
@@ -90,7 +205,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.backgroundCard} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.backgroundCard} />
 
       {/* Barre de recherche */}
       <View style={styles.searchBar}>
@@ -98,18 +213,18 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
           onPress={onBack}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Feather name="arrow-left" size={24} color={Colors.textPrimary} />
+          <Feather name="arrow-left" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
 
         <View style={styles.inputWrapper}>
-          <Feather name="search" size={16} color={Colors.textDisabled} />
+          <Feather name="search" size={16} color={colors.textDisabled} />
           <TextInput
             ref={inputRef}
             style={styles.input}
             value={query}
             onChangeText={setQuery}
             placeholder="Rechercher un article, un thème, un auteur…"
-            placeholderTextColor={Colors.textDisabled}
+            placeholderTextColor={colors.textDisabled}
             autoFocus
             returnKeyType="search"
             onSubmitEditing={handleSubmit}
@@ -121,7 +236,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
               onPress={() => setQuery('')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Feather name="x" size={16} color={Colors.textMuted} />
+              <Feather name="x" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -151,14 +266,12 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
           </View>
         )
       ) : (
-        /* Suggestions quand la barre est vide */
         <FlatList
           data={[]}
           renderItem={null}
           keyExtractor={() => ''}
           ListHeaderComponent={
             <View>
-              {/* Recherches récentes */}
               {recentSearches.length > 0 && (
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
@@ -173,7 +286,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
                       style={styles.recentRow}
                       onPress={() => handleRecentPress(term)}
                     >
-                      <Text style={styles.recentIcon}>🕐</Text>
+                      <Text style={{ fontSize: 16 }}>🕐</Text>
                       <Text style={styles.recentText}>{term}</Text>
                       <TouchableOpacity
                         onPress={() => removeRecent(term)}
@@ -186,7 +299,6 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
                 </View>
               )}
 
-              {/* Suggestions populaires */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Thèmes populaires</Text>
                 <View style={styles.suggestionsWrap}>
@@ -209,143 +321,3 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-
-  // Barre de recherche
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundCard,
-    paddingTop: Platform.OS === 'ios' ? 56 : 36,
-    paddingBottom: Spacing['3'],
-    paddingHorizontal: Spacing['4'],
-    gap: Spacing['3'],
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  backIcon: {
-    fontSize: 22,
-    color: Colors.textPrimary,
-  },
-  inputWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing['3'],
-    gap: Spacing['2'],
-    height: 44,
-  },
-  searchIcon: { fontSize: 16 },
-  input: {
-    flex: 1,
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Colors.textPrimary,
-    padding: 0,
-  },
-  clearIcon: {
-    fontSize: 14,
-    color: Colors.textMuted,
-  },
-
-  // Compteur résultats
-  resultsCount: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-    paddingHorizontal: Spacing['4'],
-    paddingVertical: Spacing['3'],
-  },
-
-  // État vide
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing['3'],
-    paddingHorizontal: Spacing['8'],
-  },
-  emptyEmoji: { fontSize: 48 },
-  emptyTitle: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize.xl,
-    color: Colors.textPrimary,
-  },
-  emptyText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    lineHeight: FontSize.base * 1.55,
-  },
-
-  // Sections suggestions
-  section: {
-    paddingHorizontal: Spacing['4'],
-    paddingTop: Spacing['5'],
-    gap: Spacing['3'],
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize.base,
-    color: Colors.textPrimary,
-  },
-  clearAll: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Colors.primary,
-  },
-
-  // Recherches récentes
-  recentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing['3'],
-    paddingVertical: Spacing['2'],
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  recentIcon: { fontSize: 16, color: Colors.textMuted },
-  recentText: {
-    flex: 1,
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Colors.textPrimary,
-  },
-  recentRemove: {
-    fontSize: 12,
-    color: Colors.textDisabled,
-  },
-
-  // Chips suggestions
-  suggestionsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing['2'],
-  },
-  suggestionChip: {
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing['3'],
-    paddingVertical: Spacing['2'],
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  suggestionText: {
-    fontFamily: FontFamily.bodySemiBold,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-  },
-});

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+
+const MENU_LOGO = require('./src/assets/icon.png');
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import {
@@ -36,6 +38,8 @@ import type { MagazineIssue } from './src/screens/magazine/MagazineScreen';
 import { MagazineIssueScreen } from './src/screens/magazine/MagazineIssueScreen';
 import { AboutScreen } from './src/screens/about/AboutScreen';
 import { SubscriptionScreen } from './src/screens/subscription/SubscriptionScreen';
+import { JobsScreen } from './src/screens/jobs/JobsScreen';
+import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import type { Category } from './src/components/common';
 
 // ─── Navigation par états ──────────────────────────────────────────────────────
@@ -59,7 +63,8 @@ type Screen =
   | 'magazine'
   | 'magazine-issue'
   | 'about'
-  | 'subscription';
+  | 'subscription'
+  | 'jobs';
 
 interface NavState {
   screen: Screen;
@@ -77,21 +82,26 @@ interface NavState {
 type TabDef = { id: Screen; icon: React.ComponentProps<typeof Feather>['name']; label: string };
 
 const TABS: TabDef[] = [
-  { id: 'home',       icon: 'home',   label: 'Accueil'  },
-  { id: 'categories', icon: 'grid',   label: 'Rubriques' },
-  { id: 'search',     icon: 'search', label: 'Recherche' },
-  { id: 'menu',       icon: 'menu',   label: 'Menu'      },
+  { id: 'home',      icon: 'home',      label: 'Accueil'   },
+  { id: 'magazine',  icon: 'book-open', label: 'Magazine'  },
+  { id: 'search',    icon: 'search',    label: 'Recherche' },
+  { id: 'jobs',      icon: 'briefcase', label: 'Emplois'   },
+  { id: 'menu',      icon: 'menu',      label: 'Menu'      },
 ];
 
-const MAIN_SCREENS: Screen[] = ['home', 'categories', 'search', 'menu'];
+const MAIN_SCREENS: Screen[] = ['home', 'magazine', 'search', 'jobs', 'menu'];
 
 const BottomTabBar: React.FC<{
   active: Screen;
   onPress: (screen: Screen) => void;
 }> = ({ active, onPress }) => {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   return (
-    <View style={[tabStyles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View style={[
+      tabStyles.bar,
+      { paddingBottom: Math.max(insets.bottom, 8), backgroundColor: colors.backgroundCard, borderTopColor: colors.borderLight },
+    ]}>
       {TABS.map((tab) => {
         const isActive = active === tab.id;
         return (
@@ -101,8 +111,16 @@ const BottomTabBar: React.FC<{
             onPress={() => onPress(tab.id)}
             activeOpacity={0.7}
           >
-            <Feather name={tab.icon} size={22} color={isActive ? '#1B9DD9' : '#9CA3AF'} />
-            <Text style={[tabStyles.label, isActive && tabStyles.labelActive]}>
+            {tab.id === 'home' ? (
+              <Image
+                source={MENU_LOGO}
+                style={{ width: 26, height: 26, tintColor: isActive ? '#1B9DD9' : colors.textDisabled }}
+                resizeMode="contain"
+              />
+            ) : (
+              <Feather name={tab.icon} size={22} color={isActive ? '#1B9DD9' : colors.textDisabled} />
+            )}
+            <Text style={[tabStyles.label, { color: colors.textDisabled }, isActive && tabStyles.labelActive]}>
               {tab.label}
             </Text>
             {isActive && <View style={tabStyles.dot} />}
@@ -116,9 +134,7 @@ const BottomTabBar: React.FC<{
 const tabStyles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
     paddingTop: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
@@ -127,7 +143,7 @@ const tabStyles = StyleSheet.create({
     elevation: 12,
   },
   tab: { flex: 1, alignItems: 'center', gap: 2 },
-  label: { fontSize: 10, fontFamily: 'Inter_400Regular', color: '#9CA3AF' },
+  label: { fontSize: 10, fontFamily: 'Inter_400Regular' },
   labelActive: { color: '#1B9DD9', fontFamily: 'Inter_600SemiBold' },
   dot: {
     position: 'absolute',
@@ -141,8 +157,9 @@ const tabStyles = StyleSheet.create({
 
 // ─── App root ─────────────────────────────────────────────────────────────────
 
-export default function App() {
+function AppContent() {
   const [nav, setNav] = useState<NavState>({ screen: 'splash' });
+  const { colors, toggleTheme, isDark } = useTheme();
 
   const [fontsLoaded] = useFonts({
     Nunito_900Black,
@@ -187,6 +204,18 @@ export default function App() {
               go('category-detail', { category: cat, categoryTitle: title })
             }
             onSearchPress={() => go('search')}
+            onBack={() => go('menu')}
+          />
+        );
+
+      case 'magazine':
+        return (
+          <MagazineScreen
+            onSubscribe={() => go('subscription')}
+            onLogin={() => go('gateway')}
+            onSettings={() => go('settings')}
+            onAbout={() => go('about')}
+            onIssuePress={(issue) => go('magazine-issue', { issue })}
           />
         );
 
@@ -226,7 +255,7 @@ export default function App() {
             }
             onSearchPress={() => go('search')}
             onNotificationPress={() => go('notifications')}
-            onMagazinePress={() => go('magazine')}
+            onRubriquesPress={() => go('categories')}
             onSettingsPress={() => go('settings')}
             onFavoritesPress={() => go('bookmarks')}
             onAboutPress={() => go('about')}
@@ -285,17 +314,11 @@ export default function App() {
         );
 
       case 'settings':
-        return <SettingsScreen onBack={() => go('menu')} />;
-
-      case 'magazine':
         return (
-          <MagazineScreen
+          <SettingsScreen
             onBack={() => go('menu')}
-            onSubscribe={() => go('subscription')}
-            onLogin={() => go('gateway')}
-            onSettings={() => go('settings')}
-            onAbout={() => go('about')}
-            onIssuePress={(issue) => go('magazine-issue', { issue })}
+            isDark={isDark}
+            onToggleDark={toggleTheme}
           />
         );
 
@@ -308,6 +331,14 @@ export default function App() {
             onLogin={() => go('login')}
           />
         ) : null;
+
+      case 'jobs':
+        return (
+          <JobsScreen
+            onSearchPress={() => go('search')}
+            onNotificationPress={() => go('notifications')}
+          />
+        );
 
       case 'about':
         return <AboutScreen onBack={() => go('menu')} />;
@@ -327,21 +358,29 @@ export default function App() {
   };
 
   return (
-    <SafeAreaProvider>
-      <View style={styles.root}>
-        <View style={styles.content}>{renderScreen()}</View>
-        {isMainTab && (
-          <BottomTabBar
-            active={screen}
-            onPress={(s) => go(s)}
-          />
-        )}
-      </View>
-    </SafeAreaProvider>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <View style={styles.content}>{renderScreen()}</View>
+      {isMainTab && (
+        <BottomTabBar
+          active={screen}
+          onPress={(s) => go(s)}
+        />
+      )}
+    </View>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <SafeAreaProvider>
+        <AppContent />
+      </SafeAreaProvider>
+    </ThemeProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F5F7FA' },
+  root: { flex: 1 },
   content: { flex: 1 },
 });

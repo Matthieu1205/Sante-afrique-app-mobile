@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -12,6 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Colors, FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { ThemeColors } from '@/contexts/ThemeContext';
 import type { MagazineIssue } from './MagazineScreen';
 
 interface MagazineIssueScreenProps {
@@ -36,6 +39,146 @@ const SOMMAIRE = [
   { page: 48, title: 'Tribune : Pour une recherche africaine souveraine' },
 ];
 
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.background },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing['4'],
+    paddingBottom: Spacing['3'],
+  },
+  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: {
+    flex: 1,
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.base,
+    color: C.white,
+    textAlign: 'center',
+  },
+  content: { paddingBottom: 48 },
+  hero: { padding: Spacing['4'], gap: Spacing['4'] },
+  heroInner: { flexDirection: 'row', gap: Spacing['4'], alignItems: 'flex-start' },
+  cover: {
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    ...Shadows.card,
+  },
+  coverNumBadge: {
+    position: 'absolute', top: 8, left: 8,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2,
+  },
+  coverNumText: { fontFamily: FontFamily.bodyBold, fontSize: 9, color: C.white },
+  coverLogoWrap: { position: 'absolute', bottom: 8 },
+  coverLogo: { fontFamily: FontFamily.logo, fontSize: 10, color: 'rgba(255,255,255,0.75)' },
+  meta: { flex: 1, gap: Spacing['2'], paddingTop: Spacing['1'] },
+  metaTitle: { fontFamily: FontFamily.logo, fontSize: 28, color: C.white, letterSpacing: -0.5, lineHeight: 30 },
+  metaLabel: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.7)' },
+  metaTheme: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.9)', lineHeight: 20 },
+  readBtn: {
+    backgroundColor: C.primary,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing['3'],
+    alignItems: 'center',
+  },
+  readBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.white },
+  buyBtn: {
+    backgroundColor: C.primary,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing['3'],
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  buyBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.white },
+  actions: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing['4'],
+    marginTop: Spacing['3'],
+    gap: Spacing['3'],
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing['2'],
+    paddingVertical: Spacing['3'],
+    borderRadius: Radius.sm,
+    borderWidth: 1.5,
+    borderColor: C.primary,
+    backgroundColor: C.backgroundCard,
+  },
+  actionBtnActive: { backgroundColor: C.primaryUltraLight },
+  actionBtnIcon: { fontSize: 18, color: C.primary },
+  actionBtnIconActive: { color: C.primaryDark },
+  actionBtnLabel: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.base, color: C.primary },
+  actionBtnLabelActive: { color: C.primaryDark },
+  loginBtn: {
+    marginHorizontal: Spacing['4'],
+    marginTop: Spacing['3'],
+    paddingVertical: Spacing['3'],
+    borderRadius: Radius.sm,
+    borderWidth: 1.5,
+    borderColor: C.primary,
+    alignItems: 'center',
+    backgroundColor: C.backgroundCard,
+  },
+  loginBtnText: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.base, color: C.primary },
+  sommaire: {
+    marginHorizontal: Spacing['4'],
+    marginTop: Spacing['4'],
+    backgroundColor: C.backgroundCard,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: C.borderLight,
+    overflow: 'hidden',
+    ...Shadows.card,
+  },
+  sommaireTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.base,
+    color: C.textPrimary,
+    padding: Spacing['4'],
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderLight,
+  },
+  sommaireRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing['3'],
+    paddingHorizontal: Spacing['4'],
+    paddingVertical: Spacing['3'],
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderLight,
+  },
+  sommairePageNum: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.sm, color: C.primary, width: 28 },
+  sommaireItemTitle: { flex: 1, fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textSecondary, lineHeight: 20 },
+  extrait: {
+    marginHorizontal: Spacing['4'],
+    marginTop: Spacing['4'],
+    backgroundColor: C.backgroundCard,
+    borderRadius: Radius.md,
+    padding: Spacing['4'],
+    gap: Spacing['3'],
+    borderWidth: 1,
+    borderColor: C.borderLight,
+    ...Shadows.card,
+  },
+  extraitTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize.base, color: C.textPrimary },
+  extraitText: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textSecondary, lineHeight: 26 },
+  extraitCta: {
+    backgroundColor: C.primary,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing['3'],
+    alignItems: 'center',
+    marginTop: Spacing['2'],
+  },
+  extraitCtaText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.white },
+});
+
 export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
   issue,
   onBack,
@@ -43,19 +186,20 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
   onLogin,
 }) => {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [tab, setTab] = useState<'info' | 'sommaire' | 'extrait'>('info');
 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
-      {/* Header bleu */}
       <LinearGradient
         colors={[Colors.primary, Colors.primaryDark]}
         style={[styles.header, { paddingTop: insets.top + Spacing['2'] }]}
       >
         <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={24} color={Colors.white} />
+          <Feather name="arrow-left" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
           Santé Afrique n°{issue.number}
@@ -65,29 +209,32 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
-        {/* Hero cover + méta */}
         <LinearGradient
           colors={['#1A2A3A', '#0D1B2A']}
           style={styles.hero}
         >
           <View style={styles.heroInner}>
-            {/* Couverture */}
-            <LinearGradient
-              colors={issue.color}
-              style={[styles.cover, { width: COVER_W, height: COVER_H }]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <View style={styles.coverNumBadge}>
-                <Text style={styles.coverNumText}>N°{issue.number}</Text>
+            {issue.coverImage ? (
+              <View style={[styles.cover, { width: COVER_W, height: COVER_H }]}>
+                <Image source={issue.coverImage} style={{ width: COVER_W, height: COVER_H }} resizeMode="cover" />
               </View>
-              <Feather name={issue.icon} size={38} color="rgba(255,255,255,0.85)" />
-              <View style={styles.coverLogoWrap}>
-                <Text style={styles.coverLogo}>santé <Text style={{ color: Colors.white }}>afrique</Text></Text>
-              </View>
-            </LinearGradient>
+            ) : (
+              <LinearGradient
+                colors={issue.color}
+                style={[styles.cover, { width: COVER_W, height: COVER_H }]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.coverNumBadge}>
+                  <Text style={styles.coverNumText}>N°{issue.number}</Text>
+                </View>
+                <Feather name={issue.icon} size={38} color="rgba(255,255,255,0.85)" />
+                <View style={styles.coverLogoWrap}>
+                  <Text style={styles.coverLogo}>santé <Text style={{ color: colors.white }}>afrique</Text></Text>
+                </View>
+              </LinearGradient>
+            )}
 
-            {/* Méta */}
             <View style={styles.meta}>
               <Text style={styles.metaTitle}>Santé{'\n'}Afrique</Text>
               <Text style={styles.metaLabel}>{issue.label}</Text>
@@ -95,7 +242,6 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
             </View>
           </View>
 
-          {/* Bouton principal */}
           {issue.free ? (
             <TouchableOpacity style={styles.readBtn} activeOpacity={0.85}>
               <Text style={styles.readBtnText}>Lire gratuitement</Text>
@@ -107,7 +253,6 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
           )}
         </LinearGradient>
 
-        {/* Tabs Sommaire / Extrait */}
         <View style={styles.actions}>
           <TouchableOpacity
             style={[styles.actionBtn, tab === 'sommaire' && styles.actionBtnActive]}
@@ -123,17 +268,15 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
             onPress={() => setTab(tab === 'extrait' ? 'info' : 'extrait')}
             activeOpacity={0.8}
           >
-            <Feather name="eye" size={18} color={tab === 'extrait' ? Colors.primaryDark : Colors.primary} />
+            <Feather name="eye" size={18} color={tab === 'extrait' ? colors.primaryDark : colors.primary} />
             <Text style={[styles.actionBtnLabel, tab === 'extrait' && styles.actionBtnLabelActive]}>Extrait</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Déjà abonné */}
         <TouchableOpacity style={styles.loginBtn} onPress={onLogin} activeOpacity={0.8}>
           <Text style={styles.loginBtnText}>Déjà abonné ? Se connecter</Text>
         </TouchableOpacity>
 
-        {/* Sommaire */}
         {tab === 'sommaire' && (
           <View style={styles.sommaire}>
             <Text style={styles.sommaireTitle}>Au sommaire</Text>
@@ -146,7 +289,6 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
           </View>
         )}
 
-        {/* Extrait */}
         {tab === 'extrait' && (
           <View style={styles.extrait}>
             <Text style={styles.extraitTitle}>Extrait — Éditorial</Text>
@@ -165,226 +307,3 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing['4'],
-    paddingBottom: Spacing['3'],
-  },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  backIcon: { fontSize: 30, color: Colors.white, lineHeight: 34, marginTop: -2 },
-  headerTitle: {
-    flex: 1,
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize.base,
-    color: Colors.white,
-    textAlign: 'center',
-  },
-
-  content: { paddingBottom: 48 },
-
-  hero: {
-    padding: Spacing['4'],
-    gap: Spacing['4'],
-  },
-  heroInner: {
-    flexDirection: 'row',
-    gap: Spacing['4'],
-    alignItems: 'flex-start',
-  },
-
-  cover: {
-    borderRadius: Radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    ...Shadows.card,
-  },
-  coverNumBadge: {
-    position: 'absolute', top: 8, left: 8,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2,
-  },
-  coverNumText: { fontFamily: FontFamily.bodyBold, fontSize: 9, color: Colors.white },
-  coverEmoji: { fontSize: 38 },
-  coverLogoWrap: { position: 'absolute', bottom: 8 },
-  coverLogo: {
-    fontFamily: FontFamily.logo,
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.75)',
-  },
-
-  meta: { flex: 1, gap: Spacing['2'], paddingTop: Spacing['1'] },
-  metaTitle: {
-    fontFamily: FontFamily.logo,
-    fontSize: 28,
-    color: Colors.white,
-    letterSpacing: -0.5,
-    lineHeight: 30,
-  },
-  metaLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  metaTheme: {
-    fontFamily: FontFamily.bodySemiBold,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.9)',
-    lineHeight: 20,
-  },
-
-  readBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.sm,
-    paddingVertical: Spacing['3'],
-    alignItems: 'center',
-  },
-  readBtnText: {
-    fontFamily: FontFamily.bodyBold,
-    fontSize: FontSize.base,
-    color: Colors.white,
-  },
-  buyBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.sm,
-    paddingVertical: Spacing['3'],
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  buyBtnText: {
-    fontFamily: FontFamily.bodyBold,
-    fontSize: FontSize.base,
-    color: Colors.white,
-  },
-
-  actions: {
-    flexDirection: 'row',
-    marginHorizontal: Spacing['4'],
-    marginTop: Spacing['3'],
-    gap: Spacing['3'],
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing['2'],
-    paddingVertical: Spacing['3'],
-    borderRadius: Radius.sm,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    backgroundColor: Colors.backgroundCard,
-  },
-  actionBtnActive: {
-    backgroundColor: Colors.primaryUltraLight,
-  },
-  actionBtnIcon: {
-    fontSize: 18,
-    color: Colors.primary,
-  },
-  actionBtnIconActive: { color: Colors.primaryDark },
-  actionBtnLabel: {
-    fontFamily: FontFamily.bodySemiBold,
-    fontSize: FontSize.base,
-    color: Colors.primary,
-  },
-  actionBtnLabelActive: { color: Colors.primaryDark },
-
-  loginBtn: {
-    marginHorizontal: Spacing['4'],
-    marginTop: Spacing['3'],
-    paddingVertical: Spacing['3'],
-    borderRadius: Radius.sm,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundCard,
-  },
-  loginBtnText: {
-    fontFamily: FontFamily.bodySemiBold,
-    fontSize: FontSize.base,
-    color: Colors.primary,
-  },
-
-  sommaire: {
-    marginHorizontal: Spacing['4'],
-    marginTop: Spacing['4'],
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    overflow: 'hidden',
-    ...Shadows.card,
-  },
-  sommaireTitle: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize.base,
-    color: Colors.textPrimary,
-    padding: Spacing['4'],
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  sommaireRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing['3'],
-    paddingHorizontal: Spacing['4'],
-    paddingVertical: Spacing['3'],
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  sommairePageNum: {
-    fontFamily: FontFamily.bodyBold,
-    fontSize: FontSize.sm,
-    color: Colors.primary,
-    width: 28,
-  },
-  sommaireItemTitle: {
-    flex: 1,
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    lineHeight: 20,
-  },
-
-  extrait: {
-    marginHorizontal: Spacing['4'],
-    marginTop: Spacing['4'],
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.md,
-    padding: Spacing['4'],
-    gap: Spacing['3'],
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    ...Shadows.card,
-  },
-  extraitTitle: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize.base,
-    color: Colors.textPrimary,
-  },
-  extraitText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Colors.textSecondary,
-    lineHeight: 26,
-  },
-  extraitCta: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.sm,
-    paddingVertical: Spacing['3'],
-    alignItems: 'center',
-    marginTop: Spacing['2'],
-  },
-  extraitCtaText: {
-    fontFamily: FontFamily.bodyBold,
-    fontSize: FontSize.base,
-    color: Colors.white,
-  },
-});

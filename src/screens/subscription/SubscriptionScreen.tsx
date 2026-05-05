@@ -11,8 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Colors, FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
-
-// ─── Types ────────────────────────────────────────────────────────
+import { useTheme } from '@/contexts/ThemeContext';
+import type { ThemeColors } from '@/contexts/ThemeContext';
 
 interface Plan {
   id: string;
@@ -31,8 +31,6 @@ interface SubscriptionScreenProps {
   onSubscribe?: (planId: string) => void;
   onLogin?: () => void;
 }
-
-// ─── Formules d'abonnement (source : santeafrique.net/abonnement) ──
 
 const PLANS: Plan[] = [
   {
@@ -94,86 +92,19 @@ const PAYMENT_METHODS: { icon: React.ComponentProps<typeof Feather>['name']; lab
   { icon: 'credit-card', label: 'Mastercard' },
 ];
 
-// ─── Carte formule ─────────────────────────────────────────────────
-
-const PlanCard: React.FC<{
-  plan: Plan;
-  selected: boolean;
-  onSelect: () => void;
-  onSubscribe: () => void;
-}> = ({ plan, selected, onSelect, onSubscribe }) => {
-  const highlighted = !!plan.badge;
-  return (
-    <TouchableOpacity
-      style={[cardS.wrapper, selected && cardS.wrapperSelected]}
-      onPress={onSelect}
-      activeOpacity={0.85}
-    >
-      {/* Badge "Le plus populaire" */}
-      {plan.badge && (
-        <View style={[cardS.badge, { backgroundColor: plan.color }]}>
-          <Feather name="star" size={11} color={Colors.white} />
-          <Text style={cardS.badgeText}>{plan.badge}</Text>
-        </View>
-      )}
-
-      {/* En-tête de la carte */}
-      <View style={cardS.header}>
-        <View style={[cardS.colorDot, { backgroundColor: plan.color }]} />
-        <View style={cardS.titleBlock}>
-          <Text style={cardS.name}>{plan.name}</Text>
-          <Text style={cardS.subtitle}>{plan.subtitle}</Text>
-        </View>
-        <View style={[cardS.radio, selected && { borderColor: plan.color }]}>
-          {selected && <View style={[cardS.radioDot, { backgroundColor: plan.color }]} />}
-        </View>
-      </View>
-
-      {/* Prix */}
-      <View style={cardS.priceRow}>
-        <Text style={cardS.priceYear}>{plan.priceYear}</Text>
-        <Text style={cardS.priceSuffix}> / an</Text>
-        <Text style={cardS.priceMonth}>  soit {plan.priceMonth}/mois</Text>
-      </View>
-
-      {/* Features */}
-      <View style={cardS.features}>
-        {plan.features.map((f) => (
-          <View key={f} style={cardS.featureRow}>
-            <Feather name="check" size={14} color={plan.color} />
-            <Text style={cardS.featureText}>{f}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* CTA */}
-      {selected && (
-        <TouchableOpacity
-          style={[cardS.ctaBtn, { backgroundColor: plan.color }]}
-          onPress={onSubscribe}
-          activeOpacity={0.85}
-        >
-          <Text style={cardS.ctaText}>{plan.cta}</Text>
-          <Feather name="arrow-right" size={16} color={Colors.white} />
-        </TouchableOpacity>
-      )}
-    </TouchableOpacity>
-  );
-};
-
-const cardS = StyleSheet.create({
+const makeCardStyles = (C: ThemeColors) => StyleSheet.create({
   wrapper: {
-    backgroundColor: Colors.backgroundCard,
+    backgroundColor: C.backgroundCard,
     borderRadius: Radius.lg,
     borderWidth: 1.5,
-    borderColor: Colors.borderLight,
+    borderColor: C.borderLight,
     padding: Spacing['4'],
     gap: Spacing['3'],
     ...Shadows.card,
   },
   wrapperSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.backgroundCard,
+    borderColor: C.primary,
+    backgroundColor: C.backgroundCard,
   },
   badge: {
     alignSelf: 'flex-start',
@@ -185,80 +116,29 @@ const cardS = StyleSheet.create({
     paddingVertical: 4,
     marginBottom: Spacing['1'],
   },
-  badgeText: {
-    fontFamily: FontFamily.bodyBold,
-    fontSize: FontSize.xs,
-    color: Colors.white,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing['3'],
-  },
-  colorDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
+  badgeText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.xs, color: C.white },
+  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing['3'] },
+  colorDot: { width: 10, height: 10, borderRadius: 5 },
   titleBlock: { flex: 1 },
-  name: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize.lg,
-    color: Colors.textPrimary,
-  },
-  subtitle: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    marginTop: 1,
-  },
+  name: { fontFamily: FontFamily.headingBold, fontSize: FontSize.lg, color: C.textPrimary },
+  subtitle: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textMuted, marginTop: 1 },
   radio: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: Colors.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    flexWrap: 'wrap',
-  },
-  priceYear: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize['2xl'],
-    color: Colors.textPrimary,
-  },
-  priceSuffix: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Colors.textMuted,
-  },
-  priceMonth: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-  },
+  radioDot: { width: 10, height: 10, borderRadius: 5 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap' },
+  priceYear: { fontFamily: FontFamily.headingBold, fontSize: FontSize['2xl'], color: C.textPrimary },
+  priceSuffix: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted },
+  priceMonth: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textMuted },
   features: { gap: Spacing['2'] },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing['2'],
-  },
-  featureText: {
-    flex: 1,
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    lineHeight: FontSize.sm * 1.5,
-  },
+  featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing['2'] },
+  featureText: { flex: 1, fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textSecondary, lineHeight: FontSize.sm * 1.5 },
   ctaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -268,14 +148,116 @@ const cardS = StyleSheet.create({
     paddingVertical: Spacing['3'],
     marginTop: Spacing['1'],
   },
-  ctaText: {
-    fontFamily: FontFamily.bodyBold,
-    fontSize: FontSize.base,
-    color: Colors.white,
-  },
+  ctaText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.white },
 });
 
-// ─── Écran principal ───────────────────────────────────────────────
+const PlanCard: React.FC<{
+  plan: Plan;
+  selected: boolean;
+  onSelect: () => void;
+  onSubscribe: () => void;
+}> = ({ plan, selected, onSelect, onSubscribe }) => {
+  const { colors } = useTheme();
+  const cardS = makeCardStyles(colors);
+  return (
+    <TouchableOpacity
+      style={[cardS.wrapper, selected && cardS.wrapperSelected]}
+      onPress={onSelect}
+      activeOpacity={0.85}
+    >
+      {plan.badge && (
+        <View style={[cardS.badge, { backgroundColor: plan.color }]}>
+          <Feather name="star" size={11} color={colors.white} />
+          <Text style={cardS.badgeText}>{plan.badge}</Text>
+        </View>
+      )}
+
+      <View style={cardS.header}>
+        <View style={[cardS.colorDot, { backgroundColor: plan.color }]} />
+        <View style={cardS.titleBlock}>
+          <Text style={cardS.name}>{plan.name}</Text>
+          <Text style={cardS.subtitle}>{plan.subtitle}</Text>
+        </View>
+        <View style={[cardS.radio, selected && { borderColor: plan.color }]}>
+          {selected && <View style={[cardS.radioDot, { backgroundColor: plan.color }]} />}
+        </View>
+      </View>
+
+      <View style={cardS.priceRow}>
+        <Text style={cardS.priceYear}>{plan.priceYear}</Text>
+        <Text style={cardS.priceSuffix}> / an</Text>
+        <Text style={cardS.priceMonth}>  soit {plan.priceMonth}/mois</Text>
+      </View>
+
+      <View style={cardS.features}>
+        {plan.features.map((f) => (
+          <View key={f} style={cardS.featureRow}>
+            <Feather name="check" size={14} color={plan.color} />
+            <Text style={cardS.featureText}>{f}</Text>
+          </View>
+        ))}
+      </View>
+
+      {selected && (
+        <TouchableOpacity
+          style={[cardS.ctaBtn, { backgroundColor: plan.color }]}
+          onPress={onSubscribe}
+          activeOpacity={0.85}
+        >
+          <Text style={cardS.ctaText}>{plan.cta}</Text>
+          <Feather name="arrow-right" size={16} color={colors.white} />
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+};
+
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.background },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing['4'],
+    paddingBottom: Spacing['4'],
+    gap: Spacing['3'],
+  },
+  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
+  headerLogo: { fontFamily: FontFamily.logo, fontSize: FontSize.xl, color: 'rgba(255,255,255,0.85)', letterSpacing: -0.3 },
+  headerLogoW: { color: C.white },
+  headerTagline: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.75)' },
+  content: { paddingHorizontal: Spacing['4'], paddingTop: Spacing['4'], gap: Spacing['4'] },
+  intro: { alignItems: 'center', gap: Spacing['1'] },
+  introTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize.xl, color: C.textPrimary, textAlign: 'center' },
+  introSub: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textMuted, textAlign: 'center' },
+  plans: { gap: Spacing['3'] },
+  paymentBlock: {
+    backgroundColor: C.backgroundCard,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: C.borderLight,
+    padding: Spacing['4'],
+    gap: Spacing['3'],
+  },
+  paymentTitle: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.xs, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  paymentRow: { flexDirection: 'row', gap: Spacing['2'], flexWrap: 'wrap' },
+  paymentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing['2'],
+    backgroundColor: C.background,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: Spacing['3'],
+    paddingVertical: Spacing['2'],
+  },
+  paymentLabel: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textSecondary },
+  loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  loginText: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted },
+  loginLink: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.primary },
+  legal: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textDisabled, textAlign: 'center', lineHeight: FontSize.xs * 1.6 },
+});
 
 export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
   onBack,
@@ -283,6 +265,8 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
   onLogin,
 }) => {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [selectedPlan, setSelectedPlan] = useState('digital');
 
   const handleSubscribe = (planId: string) => {
@@ -293,7 +277,6 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
-      {/* Header gradient */}
       <LinearGradient
         colors={[Colors.primary, Colors.primaryDark]}
         style={[styles.header, { paddingTop: insets.top + Spacing['2'] }]}
@@ -304,7 +287,7 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
             onPress={onBack}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Feather name="arrow-left" size={24} color={Colors.white} />
+            <Feather name="arrow-left" size={24} color={colors.white} />
           </TouchableOpacity>
         )}
         <View style={styles.headerCenter}>
@@ -320,7 +303,6 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
       >
-        {/* Accroche */}
         <View style={styles.intro}>
           <Text style={styles.introTitle}>Accès illimité à Santé Afrique</Text>
           <Text style={styles.introSub}>
@@ -328,7 +310,6 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
           </Text>
         </View>
 
-        {/* Plans */}
         <View style={styles.plans}>
           {PLANS.map((plan) => (
             <PlanCard
@@ -341,20 +322,18 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
           ))}
         </View>
 
-        {/* Modes de paiement */}
         <View style={styles.paymentBlock}>
           <Text style={styles.paymentTitle}>Paiement accepté</Text>
           <View style={styles.paymentRow}>
             {PAYMENT_METHODS.map((m, i) => (
               <View key={i} style={styles.paymentChip}>
-                <Feather name={m.icon} size={16} color={Colors.textSecondary} />
+                <Feather name={m.icon} size={16} color={colors.textSecondary} />
                 <Text style={styles.paymentLabel}>{m.label}</Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Déjà abonné */}
         <View style={styles.loginRow}>
           <Text style={styles.loginText}>Déjà abonné ?</Text>
           <TouchableOpacity onPress={onLogin}>
@@ -362,7 +341,6 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Mentions légales */}
         <Text style={styles.legal}>
           En vous abonnant, vous acceptez nos conditions générales d'utilisation.
           Abonnement annuel reconduit automatiquement. Résiliation possible à tout moment.
@@ -371,112 +349,3 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing['4'],
-    paddingBottom: Spacing['4'],
-    gap: Spacing['3'],
-  },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
-  headerLogo: {
-    fontFamily: FontFamily.logo,
-    fontSize: FontSize.xl,
-    color: 'rgba(255,255,255,0.85)',
-    letterSpacing: -0.3,
-  },
-  headerLogoW: { color: Colors.white },
-  headerTagline: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.75)',
-  },
-
-  content: {
-    paddingHorizontal: Spacing['4'],
-    paddingTop: Spacing['4'],
-    gap: Spacing['4'],
-  },
-
-  intro: { alignItems: 'center', gap: Spacing['1'] },
-  introTitle: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize.xl,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-  },
-  introSub: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-    textAlign: 'center',
-  },
-
-  plans: { gap: Spacing['3'] },
-
-  paymentBlock: {
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    padding: Spacing['4'],
-    gap: Spacing['3'],
-  },
-  paymentTitle: {
-    fontFamily: FontFamily.bodyBold,
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  paymentRow: {
-    flexDirection: 'row',
-    gap: Spacing['2'],
-    flexWrap: 'wrap',
-  },
-  paymentChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing['2'],
-    backgroundColor: Colors.background,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: Spacing['3'],
-    paddingVertical: Spacing['2'],
-  },
-  paymentLabel: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-  },
-
-  loginRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loginText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Colors.textMuted,
-  },
-  loginLink: {
-    fontFamily: FontFamily.bodyBold,
-    fontSize: FontSize.base,
-    color: Colors.primary,
-  },
-
-  legal: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: Colors.textDisabled,
-    textAlign: 'center',
-    lineHeight: FontSize.xs * 1.6,
-  },
-});

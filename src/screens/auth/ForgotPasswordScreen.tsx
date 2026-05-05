@@ -10,18 +10,66 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Colors, FontFamily, FontSize, Spacing, Radius } from '@/theme';
+import { FontFamily, FontSize, Spacing, Radius } from '@/theme';
 import { Button } from '@/components/common';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { ThemeColors } from '@/contexts/ThemeContext';
 
 interface ForgotPasswordScreenProps {
   onBack: () => void;
   onSuccess?: () => void;
 }
 
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.background },
+  container: { flex: 1, paddingTop: Platform.OS === 'ios' ? 56 : 36, paddingHorizontal: Spacing['5'] },
+  header: { marginBottom: Spacing['4'] },
+  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  form: { gap: Spacing['4'] },
+  iconWrapper: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: C.primaryUltraLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing['2'],
+  },
+  pageTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize['3xl'], color: C.textPrimary, letterSpacing: -0.5 },
+  pageSubtitle: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted, lineHeight: FontSize.base * 1.55, marginTop: -Spacing['2'] },
+  fieldWrapper: { gap: Spacing['1'] },
+  label: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.base, color: C.textPrimary },
+  input: {
+    backgroundColor: C.backgroundCard,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing['4'],
+    paddingVertical: Spacing['3'],
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.md,
+    color: C.textPrimary,
+    height: 52,
+  },
+  inputError: { borderColor: C.error },
+  errorText: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.error },
+  submitBtn: { marginTop: Spacing['2'] },
+  cancelRow: { alignItems: 'center', paddingTop: Spacing['2'] },
+  cancelText: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted, textDecorationLine: 'underline' },
+  successState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing['4'], paddingBottom: 80 },
+  successTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize['2xl'], color: C.textPrimary },
+  successText: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted, textAlign: 'center', lineHeight: FontSize.base * 1.55 },
+  successEmail: { fontFamily: FontFamily.bodyBold, color: C.primary },
+  backToLoginBtn: { marginTop: Spacing['4'], width: '100%' },
+});
+
 export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
   onBack,
   onSuccess,
 }) => {
+  const { colors, isDark } = useTheme();
+  const styles = makeStyles(colors);
+
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -31,58 +79,35 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
   const handleSubmit = () => {
     if (!emailValid) return;
     setLoading(true);
-    // TODO: POST /wp-json/wc/v3/customers/password ou endpoint personnalisé
-    setTimeout(() => {
-      setLoading(false);
-      setSent(true);
-      onSuccess?.();
-    }, 1200);
+    setTimeout(() => { setLoading(false); setSent(true); onSuccess?.(); }, 1200);
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={onBack}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Feather name="arrow-left" size={24} color={Colors.textPrimary} />
+          <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Feather name="arrow-left" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
         {sent ? (
-          /* État succès */
           <View style={styles.successState}>
-            <Text style={styles.successEmoji}>✉️</Text>
+            <Text style={{ fontSize: 56 }}>✉️</Text>
             <Text style={styles.successTitle}>Email envoyé !</Text>
             <Text style={styles.successText}>
               Un lien de réinitialisation a été envoyé à{' '}
               <Text style={styles.successEmail}>{email}</Text>.{'\n'}
               Vérifiez votre boîte de réception (et les spams).
             </Text>
-            <Button
-              label="Retour à la connexion"
-              variant="primary"
-              size="lg"
-              fullWidth
-              onPress={onBack}
-              style={styles.backToLoginBtn}
-            />
+            <Button label="Retour à la connexion" variant="primary" size="lg" fullWidth onPress={onBack} style={styles.backToLoginBtn} />
           </View>
         ) : (
-          /* Formulaire */
           <View style={styles.form}>
-            {/* Illustration */}
             <View style={styles.iconWrapper}>
-              <Text style={styles.lockIcon}>🔑</Text>
+              <Text style={{ fontSize: 32 }}>🔑</Text>
             </View>
 
             <Text style={styles.pageTitle}>Mot de passe oublié</Text>
@@ -100,7 +125,7 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholder="vous@exemple.com"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={colors.textDisabled}
                 returnKeyType="done"
                 onSubmitEditing={emailValid ? handleSubmit : undefined}
                 autoFocus
@@ -110,16 +135,7 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
               )}
             </View>
 
-            <Button
-              label="Envoyer le lien"
-              variant="primary"
-              size="lg"
-              fullWidth
-              loading={loading}
-              disabled={!emailValid}
-              onPress={handleSubmit}
-              style={styles.submitBtn}
-            />
+            <Button label="Envoyer le lien" variant="primary" size="lg" fullWidth loading={loading} disabled={!emailValid} onPress={handleSubmit} style={styles.submitBtn} />
 
             <TouchableOpacity onPress={onBack} style={styles.cancelRow}>
               <Text style={styles.cancelText}>Annuler</Text>
@@ -130,100 +146,3 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
     </KeyboardAvoidingView>
   );
 };
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
-  container: {
-    flex: 1,
-    paddingTop: Platform.OS === 'ios' ? 56 : 36,
-    paddingHorizontal: Spacing['5'],
-  },
-  header: { marginBottom: Spacing['4'] },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  backIcon: { fontSize: 22, color: Colors.textPrimary },
-
-  // Formulaire
-  form: { gap: Spacing['4'] },
-  iconWrapper: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.primaryUltraLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing['2'],
-  },
-  lockIcon: { fontSize: 32 },
-  pageTitle: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize['3xl'],
-    color: Colors.textPrimary,
-    letterSpacing: -0.5,
-  },
-  pageSubtitle: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Colors.textMuted,
-    lineHeight: FontSize.base * 1.55,
-    marginTop: -Spacing['2'],
-  },
-  fieldWrapper: { gap: Spacing['1'] },
-  label: {
-    fontFamily: FontFamily.bodySemiBold,
-    fontSize: FontSize.base,
-    color: Colors.textPrimary,
-  },
-  input: {
-    backgroundColor: Colors.backgroundCard,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing['4'],
-    paddingVertical: Spacing['3'],
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.md,
-    color: Colors.textPrimary,
-    height: 52,
-  },
-  inputError: { borderColor: Colors.error },
-  errorText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: Colors.error,
-  },
-  submitBtn: { marginTop: Spacing['2'] },
-  cancelRow: { alignItems: 'center', paddingTop: Spacing['2'] },
-  cancelText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Colors.textMuted,
-    textDecorationLine: 'underline',
-  },
-
-  // Succès
-  successState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing['4'],
-    paddingBottom: 80,
-  },
-  successEmoji: { fontSize: 56 },
-  successTitle: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize['2xl'],
-    color: Colors.textPrimary,
-  },
-  successText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    lineHeight: FontSize.base * 1.55,
-  },
-  successEmail: {
-    fontFamily: FontFamily.bodyBold,
-    color: Colors.primary,
-  },
-  backToLoginBtn: { marginTop: Spacing['4'], width: '100%' },
-});

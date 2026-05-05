@@ -11,9 +11,10 @@ import {
 import { ArticleCard, SponsoredCard } from '@/components/common';
 import type { Article, ArticleType, Category } from '@/components/common';
 import { Feather } from '@expo/vector-icons';
-import { Colors, FontFamily, FontSize, Spacing } from '@/theme';
+import { FontFamily, FontSize, Spacing } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { ThemeColors } from '@/contexts/ThemeContext';
 
-// Articles mock étoffés par rubrique
 const ARTICLES_BY_CATEGORY: Record<string, Article[]> = {
   actualites: [
     { id: 'a1', title: "Paludisme en Afrique de l'Ouest : l'OMS déploie un nouveau protocole de traitement pour 2026", category: 'actualites', articleType: 'actualite', date: '25 avr. 2026', hasAudio: true },
@@ -50,9 +51,7 @@ const FALLBACK_ARTICLES: Article[] = [
   { id: 'f4', title: 'Innovation en santé : les startups africaines à suivre', category: 'business_sante', articleType: 'actualite', date: '14 avr. 2026', hasAudio: false, isPremium: true },
 ];
 
-type FeedItem =
-  | { type: 'article'; data: Article }
-  | { type: 'sponsored' };
+type FeedItem = { type: 'article'; data: Article } | { type: 'sponsored' };
 
 const ARTICLE_TYPE_FILTERS: { value: ArticleType | 'all'; label: string }[] = [
   { value: 'all', label: 'Tout' },
@@ -70,21 +69,47 @@ interface CategoryDetailScreenProps {
   onBack: () => void;
 }
 
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.background },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.backgroundCard,
+    paddingTop: 52,
+    paddingBottom: Spacing['3'],
+    paddingHorizontal: Spacing['4'],
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderLight,
+  },
+  backBtn: { width: 36, alignItems: 'center' },
+  headerTitle: { flex: 1, fontFamily: FontFamily.headingBold, fontSize: FontSize.lg, color: C.textPrimary, textAlign: 'center' },
+  filterRow: { backgroundColor: C.backgroundCard, borderBottomWidth: 1, borderBottomColor: C.borderLight },
+  filterContent: { paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'], gap: Spacing['2'] },
+  filterChip: { paddingHorizontal: Spacing['3'], paddingVertical: 6, borderRadius: 999, backgroundColor: C.background, borderWidth: 1, borderColor: C.border },
+  filterChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  filterText: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm, color: C.textSecondary },
+  filterTextActive: { color: C.white },
+  feed: { flex: 1 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing['3'], paddingHorizontal: Spacing['8'] },
+  emptyEmoji: { fontSize: 48 },
+  emptyTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize.xl, color: C.textPrimary },
+  emptyText: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted, textAlign: 'center', lineHeight: FontSize.base * 1.5 },
+});
+
 export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
   category,
   categoryTitle,
   onArticlePress,
   onBack,
 }) => {
+  const { colors, isDark } = useTheme();
+  const styles = makeStyles(colors);
   const [activeFilter, setActiveFilter] = useState<ArticleType | 'all'>('all');
 
   const rawArticles = ARTICLES_BY_CATEGORY[category] ?? FALLBACK_ARTICLES;
 
   const articles = useMemo(
-    () =>
-      activeFilter === 'all'
-        ? rawArticles
-        : rawArticles.filter((a) => a.articleType === activeFilter),
+    () => activeFilter === 'all' ? rawArticles : rawArticles.filter((a) => a.articleType === activeFilter),
     [rawArticles, activeFilter],
   );
 
@@ -99,41 +124,23 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
 
   const renderItem: ListRenderItem<FeedItem> = ({ item }) => {
     if (item.type === 'sponsored') {
-      return (
-        <SponsoredCard
-          title="Les solutions de santé digitale au service des populations africaines"
-          sponsor="OMS Afrique"
-        />
-      );
+      return <SponsoredCard title="Les solutions de santé digitale au service des populations africaines" sponsor="OMS Afrique" />;
     }
-    return (
-      <ArticleCard
-        article={item.data}
-        onPress={() => onArticlePress(item.data.id)}
-      />
-    );
+    return <ArticleCard article={item.data} onPress={() => onArticlePress(item.data.id)} />;
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.backgroundCard} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.backgroundCard} />
 
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={onBack}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Feather name="arrow-left" size={24} color={Colors.textPrimary} />
+        <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Feather name="arrow-left" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {categoryTitle}
-        </Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>{categoryTitle}</Text>
         <View style={styles.backBtn} />
       </View>
 
-      {/* Filtre type article */}
       <View style={styles.filterRow}>
         <FlatList
           data={ARTICLE_TYPE_FILTERS}
@@ -143,18 +150,10 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
           contentContainerStyle={styles.filterContent}
           renderItem={({ item: filter }) => (
             <TouchableOpacity
-              style={[
-                styles.filterChip,
-                activeFilter === filter.value && styles.filterChipActive,
-              ]}
+              style={[styles.filterChip, activeFilter === filter.value && styles.filterChipActive]}
               onPress={() => setActiveFilter(filter.value)}
             >
-              <Text
-                style={[
-                  styles.filterText,
-                  activeFilter === filter.value && styles.filterTextActive,
-                ]}
-              >
+              <Text style={[styles.filterText, activeFilter === filter.value && styles.filterTextActive]}>
                 {filter.label}
               </Text>
             </TouchableOpacity>
@@ -162,21 +161,16 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
         />
       </View>
 
-      {/* Feed */}
       {articles.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>📭</Text>
           <Text style={styles.emptyTitle}>Aucun article</Text>
-          <Text style={styles.emptyText}>
-            Aucun article ne correspond à ce filtre pour l'instant.
-          </Text>
+          <Text style={styles.emptyText}>Aucun article ne correspond à ce filtre pour l'instant.</Text>
         </View>
       ) : (
         <FlatList
           data={feedItems}
-          keyExtractor={(item, index) =>
-            item.type === 'article' ? `art-${item.data.id}` : `sp-${index}`
-          }
+          keyExtractor={(item, index) => item.type === 'article' ? `art-${item.data.id}` : `sp-${index}`}
           renderItem={renderItem}
           showsVerticalScrollIndicator={false}
           style={styles.feed}
@@ -185,95 +179,3 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundCard,
-    paddingTop: 52,
-    paddingBottom: Spacing['3'],
-    paddingHorizontal: Spacing['4'],
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  backBtn: {
-    width: 36,
-    alignItems: 'center',
-  },
-  backIcon: {
-    fontSize: 22,
-    color: Colors.textPrimary,
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize.lg,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-  },
-
-  // Filtres
-  filterRow: {
-    backgroundColor: Colors.backgroundCard,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  filterContent: {
-    paddingHorizontal: Spacing['4'],
-    paddingVertical: Spacing['3'],
-    gap: Spacing['2'],
-  },
-  filterChip: {
-    paddingHorizontal: Spacing['3'],
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  filterChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  filterText: {
-    fontFamily: FontFamily.bodySemiBold,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-  },
-  filterTextActive: {
-    color: Colors.white,
-  },
-
-  feed: {
-    flex: 1,
-  },
-
-  // État vide
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing['3'],
-    paddingHorizontal: Spacing['8'],
-  },
-  emptyEmoji: {
-    fontSize: 48,
-  },
-  emptyTitle: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize.xl,
-    color: Colors.textPrimary,
-  },
-  emptyText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    lineHeight: FontSize.base * 1.5,
-  },
-});

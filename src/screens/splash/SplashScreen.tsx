@@ -2,12 +2,17 @@ import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
+  Image,
   Animated,
   StyleSheet,
   StatusBar,
   Dimensions,
 } from 'react-native';
 import { Colors, FontFamily, FontSize } from '@/theme';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const LOGO_BG = require('../../assets/logo2.png');
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -41,6 +46,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+
+      <Image source={LOGO_BG} style={styles.bgLogo} resizeMode="contain" />
 
       <Animated.View
         style={[
@@ -87,6 +94,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bgLogo: {
+    position: 'absolute',
+    width: SCREEN_WIDTH * 1.1,
+    height: SCREEN_WIDTH * 1.1,
+    opacity: 0.12,
   },
   content: {
     alignItems: 'center',

@@ -4,10 +4,10 @@
     "slug": "sante-afrique",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./src/assets/icon.png",
+    "icon": "./src/assets/logo-SA.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./src/assets/icon.png",
+      "image": "./src/assets/logo2.png",
       "backgroundColor": "#1B9DD9",
       "resizeMode": "contain"
     },
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./src/assets/icon.png",
+        "foregroundImage": "./src/assets/logo2.png",
         "backgroundColor": "#1B9DD9"
       },
       "package": "net.santeafrique.app"
@@ -27,6 +27,11 @@
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2fd4ad64-9845-403b-a1f1-fafa0945f0c5"
+      }
+    }
   }
 }
