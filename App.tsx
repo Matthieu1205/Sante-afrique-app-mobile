@@ -39,6 +39,7 @@ import { MagazineIssueScreen } from './src/screens/magazine/MagazineIssueScreen'
 import { AboutScreen } from './src/screens/about/AboutScreen';
 import { SubscriptionScreen } from './src/screens/subscription/SubscriptionScreen';
 import { JobsScreen } from './src/screens/jobs/JobsScreen';
+import { PartnersScreen } from './src/screens/partners/PartnersScreen';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import type { Category } from './src/components/common';
 
@@ -64,7 +65,8 @@ type Screen =
   | 'magazine-issue'
   | 'about'
   | 'subscription'
-  | 'jobs';
+  | 'jobs'
+  | 'partners';
 
 interface NavState {
   screen: Screen;
@@ -256,6 +258,8 @@ function AppContent() {
             onSearchPress={() => go('search')}
             onNotificationPress={() => go('notifications')}
             onRubriquesPress={() => go('categories')}
+            onJobsPress={() => go('jobs')}
+            onPartnersPress={() => go('partners')}
             onSettingsPress={() => go('settings')}
             onFavoritesPress={() => go('bookmarks')}
             onAboutPress={() => go('about')}
@@ -337,6 +341,14 @@ function AppContent() {
           <JobsScreen
             onSearchPress={() => go('search')}
             onNotificationPress={() => go('notifications')}
+          />
+        );
+
+      case 'partners':
+        return (
+          <PartnersScreen
+            onBack={() => go('menu')}
+            onJobsPress={() => go('jobs')}
           />
         );
 
