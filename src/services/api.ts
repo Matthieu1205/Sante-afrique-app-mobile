@@ -63,12 +63,12 @@ export interface PaginatedResponse<T> {
 
 // ─── Cache ────────────────────────────────────────────────────────
 
-async function cacheGet<T>(key: string): Promise<T | null> {
+async function cacheGet<T>(key: string, ttl = CACHE_TTL): Promise<T | null> {
   try {
     const raw = await AsyncStorage.getItem(`api_cache_${key}`);
     if (!raw) return null;
     const { data, ts } = JSON.parse(raw);
-    if (Date.now() - ts > CACHE_TTL) return null;
+    if (Date.now() - ts > ttl) return null;
     return data as T;
   } catch {
     return null;
@@ -83,9 +83,9 @@ async function cacheSet(key: string, data: unknown): Promise<void> {
 
 // ─── Fetch helper ─────────────────────────────────────────────────
 
-async function apiFetch<T>(path: string, cacheKey?: string): Promise<T | null> {
+async function apiFetch<T>(path: string, cacheKey?: string, ttl = CACHE_TTL): Promise<T | null> {
   const key = cacheKey ?? path;
-  const cached = await cacheGet<T>(key);
+  const cached = await cacheGet<T>(key, ttl);
   if (cached) return cached;
 
   try {
@@ -224,6 +224,61 @@ const RUBRIQUE_SLUG_MAP: Record<string, string> = {
 export function resolveRubriqueSlug(localSlug: string): string {
   if (localSlug in RUBRIQUE_SLUG_MAP) return RUBRIQUE_SLUG_MAP[localSlug];
   return localSlug.replace(/_/g, '-'); // fallback générique
+}
+
+// ─── Recherche full-text ──────────────────────────────────────────
+
+export async function searchArticlesApi(query: string): Promise<ApiArticle[]> {
+  if (!query.trim()) return [];
+  try {
+    const res = await fetch(
+      `${BASE}/articles?search=${encodeURIComponent(query)}&per_page=20`,
+      { headers: { Accept: 'application/json' } },
+    );
+    if (!res.ok) return [];
+    const json = await res.json() as PaginatedResponse<ApiArticle>;
+    return json.data ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// ─── Magazine ────────────────────────────────────────────────────
+
+export interface ApiMagazineIssue {
+  id: number;
+  number: number;
+  label: string;
+  theme: string;
+  free: boolean;
+  price: string;
+  cover_url: string | null;
+}
+
+export async function fetchMagazineIssues(): Promise<ApiMagazineIssue[]> {
+  const res = await apiFetch<{ data: ApiMagazineIssue[] }>('/magazine/issues', 'magazine_issues');
+  return res?.data ?? [];
+}
+
+// ─── Abonnements ─────────────────────────────────────────────────
+
+export interface ApiPlan {
+  id: string;
+  name: string;
+  price_year: string;
+  price_month: string;
+  description: string;
+  features: string[];
+  recommended?: boolean;
+}
+
+export async function fetchSubscriptionPlans(): Promise<ApiPlan[]> {
+  const res = await apiFetch<{ data: ApiPlan[] }>(
+    '/subscriptions/plans',
+    'subscription_plans',
+    30 * 60 * 1000,
+  );
+  return res?.data ?? [];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────

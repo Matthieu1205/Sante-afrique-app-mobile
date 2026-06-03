@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,15 @@ import {
   StyleSheet,
   StatusBar,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
+import { fetchSubscriptionPlans } from '@/services/api';
+import type { ApiPlan } from '@/services/api';
 
 const BRAND = '#1B9DD9';
 const RECOMMENDED_BORDER = '#7dd3f8';
@@ -37,7 +40,27 @@ interface SubscriptionScreenProps {
   onLogin?: () => void;
 }
 
-const PLANS: Plan[] = [
+const TAG_MAP: Record<string, string> = {
+  premium:       'ABONNEMENT ANNUEL PREMIUM',
+  print_digital: 'ÉDITION PAPIER + NUMÉRIQUE (ANNUEL)',
+  digital:       'ÉDITION NUMÉRIQUE (ANNUEL)',
+};
+
+function mapApiPlan(a: ApiPlan): Plan {
+  return {
+    id:          a.id,
+    tag:         TAG_MAP[a.id] ?? a.name.toUpperCase(),
+    name:        a.name,
+    priceYear:   a.price_year,
+    priceMonth:  a.price_month,
+    description: a.description,
+    features:    a.features,
+    recommended: a.recommended,
+    ctaColor:    BRAND,
+  };
+}
+
+const PLANS_FALLBACK: Plan[] = [
   {
     id: 'premium',
     tag: 'ABONNEMENT ANNUEL PREMIUM',
@@ -345,6 +368,16 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
   const { colors, isDark } = useTheme();
   const styles = makeStyles(colors);
 
+  const [plans, setPlans] = useState<Plan[]>(PLANS_FALLBACK);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+
+  useEffect(() => {
+    fetchSubscriptionPlans().then((data) => {
+      if (data.length > 0) setPlans(data.map(mapApiPlan));
+      setLoadingPlans(false);
+    });
+  }, []);
+
   return (
     <View style={styles.container}>
       <StatusBar
@@ -389,7 +422,10 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
         <View style={styles.plansSection}>
           <Text style={styles.plansSectionTitle}>Choisissez la formule qui vous convient</Text>
 
-          {PLANS.map((plan) => (
+          {loadingPlans ? (
+            <ActivityIndicator size="large" color={BRAND} style={{ marginVertical: 32 }} />
+          ) : null}
+          {plans.map((plan) => (
             <View key={plan.id} style={[styles.planCard, plan.recommended && styles.planCardRecommended]}>
 
               {plan.recommended && (

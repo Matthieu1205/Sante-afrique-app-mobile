@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   StatusBar,
   Platform,
   ListRenderItem,
+  ActivityIndicator,
 } from 'react-native';
 import { ArticleCard } from '@/components/common';
 import type { Article } from '@/components/common';
@@ -16,7 +17,7 @@ import { Feather } from '@expo/vector-icons';
 import { FontFamily, FontSize, Spacing, Radius } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
-import { fetchArticles, formatDate, getImageUrl } from '@/services/api';
+import { searchArticlesApi, formatDate, getImageUrl } from '@/services/api';
 import type { ApiArticle } from '@/services/api';
 
 function mapArticle(a: ApiArticle): Article {
@@ -30,36 +31,8 @@ function mapArticle(a: ApiArticle): Article {
   };
 }
 
-// ─── Données mock pour la recherche ──────────────────────────────
-
-const ALL_ARTICLES: Article[] = [
-  { id: '1',  title: "Paludisme en Afrique de l'Ouest : l'OMS déploie un nouveau protocole de traitement", category: 'actualites', articleType: 'actualite', date: '25 avr. 2026', hasAudio: true },
-  { id: '2',  title: 'Dr Aminata Koné : "La santé maternelle reste notre priorité absolue en Afrique subsaharienne"', category: 'sante_maternelle', articleType: 'grand_entretien', date: '24 avr. 2026', hasAudio: true, isPremium: true },
-  { id: '3',  title: 'Nutrition infantile : les aliments locaux africains surpassent souvent les compléments importés', category: 'nutrition_infantile', articleType: 'dossier', date: '23 avr. 2026' },
-  { id: '4',  title: 'One Health : comment la santé des animaux impacte celle des humains au Sahel', category: 'one_health', articleType: 'one_health', date: '22 avr. 2026' },
-  { id: '5',  title: "Vaccination HPV : un enjeu capital pour réduire le cancer du col en Côte d'Ivoire", category: 'vaccination', articleType: 'vaccination', date: '21 avr. 2026', hasAudio: true },
-  { id: '6',  title: 'Santé mentale : briser le tabou dans les communautés africaines', category: 'sante_mentale', articleType: 'tribune', date: '20 avr. 2026', isPremium: true },
-  { id: '7',  title: 'Business Santé : les startups healthtech africaines lèvent 120M$ au 1er trimestre 2026', category: 'business_sante', articleType: 'actualite', date: '19 avr. 2026' },
-  { id: '8',  title: "Les ODD santé : bilan à mi-parcours pour l'Afrique de l'Ouest", category: 'les_odd', articleType: 'dossier_special', date: '18 avr. 2026' },
-  { id: '9',  title: "Équité d'accès : les médicaments essentiels toujours hors de portée pour 40 % de la population", category: 'equite_acces', articleType: 'debat', date: '17 avr. 2026', hasAudio: true, isPremium: true },
-  { id: '10', title: 'Hypertension artérielle : le mal silencieux qui touche 40 % des adultes africains', category: 'actualites', articleType: 'actualite', date: '16 avr. 2026', hasAudio: true },
-  { id: '11', title: 'Diabète de type 2 : progression alarmante dans les villes africaines', category: 'dossier', articleType: 'dossier', date: '15 avr. 2026' },
-  { id: '12', title: "Allaitement maternel : clé d'un bon démarrage pour l'enfant africain", category: 'sante_maternelle', articleType: 'conseil_pratique', date: '14 avr. 2026' },
-  { id: '13', title: 'Burn-out des soignants africains : une crise silencieuse et préoccupante', category: 'sante_mentale', articleType: 'dossier', date: '12 avr. 2026' },
-  { id: '14', title: "ROR : pourquoi la rougeole repart à la hausse en zones de conflit", category: 'vaccination', articleType: 'actualite', date: '10 avr. 2026' },
-  { id: '15', title: 'Couverture santé universelle : où en est vraiment l\'Afrique en 2026 ?', category: 'les_odd', articleType: 'debat', date: '8 avr. 2026', isPremium: true },
-];
-
 const RECENT_SEARCHES_INITIAL = ['paludisme', 'santé maternelle', 'nutrition infantile'];
 const SUGGESTIONS = ['paludisme', 'vaccination', 'maternité', 'nutrition', 'OMS', 'diabète', 'cancer', 'mental'];
-
-function searchArticles(query: string, articles: Article[]): Article[] {
-  const q = query.toLowerCase().trim();
-  if (!q) return [];
-  return articles.filter(
-    (a) => a.title.toLowerCase().includes(q) || a.category.toLowerCase().includes(q),
-  );
-}
 
 interface SearchScreenProps {
   onArticlePress: (articleId: string) => void;
@@ -190,16 +163,22 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
 
   const [query, setQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>(RECENT_SEARCHES_INITIAL);
-  const [allArticles, setAllArticles] = useState<Article[]>(ALL_ARTICLES);
-
-  useEffect(() => {
-    fetchArticles(1).then((res) => {
-      if (res?.data?.length) setAllArticles(res.data.map(mapArticle));
-    });
-  }, []);
+  const [results, setResults] = useState<Article[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
 
-  const results = useMemo(() => searchArticles(query, allArticles), [query, allArticles]);
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim()) { setResults([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      const raw = await searchArticlesApi(query);
+      setResults(raw.map(mapArticle));
+      setSearching(false);
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query]);
 
   const handleSubmit = useCallback(() => {
     const q = query.trim();
@@ -264,7 +243,11 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
 
       {/* Résultats */}
       {query.length > 0 ? (
-        results.length > 0 ? (
+        searching ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : results.length > 0 ? (
           <FlatList
             data={results}
             keyExtractor={(item) => item.id}

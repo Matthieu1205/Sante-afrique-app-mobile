@@ -10,8 +10,9 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { ThemeColors } from "@/contexts/ThemeContext";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   FlatList,
@@ -25,6 +26,31 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { fetchMagazineIssues } from "@/services/api";
+import type { ApiMagazineIssue } from "@/services/api";
+
+const COVER_COLORS: [string, string][] = [
+  ["#1E3A5F", "#0A2540"],
+  ["#0A3D2E", "#051F17"],
+  ["#4B1D6B", "#2A0E3F"],
+  ["#166534", "#052E16"],
+  ["#7F1D1D", "#450A0A"],
+  ["#1B4D6E", "#0D2B40"],
+];
+
+function mapApiIssue(a: ApiMagazineIssue, idx: number): MagazineIssue {
+  return {
+    id:         String(a.id),
+    number:     a.number,
+    label:      a.label,
+    theme:      a.theme,
+    free:       a.free,
+    price:      a.price,
+    color:      COVER_COLORS[idx % COVER_COLORS.length],
+    icon:       "book-open",
+    coverImage: a.cover_url ? { uri: a.cover_url } : undefined,
+  };
+}
 
 export interface MagazineIssue {
   id: string;
@@ -443,8 +469,18 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
   const styles = makeStyles(colors);
   const [tab, setTab] = useState<TabKey>("kiosk");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const latest = ISSUES[0];
-  const archives = ISSUES.slice(1);
+  const [issues, setIssues] = useState<MagazineIssue[]>(ISSUES);
+  const [loadingIssues, setLoadingIssues] = useState(true);
+
+  useEffect(() => {
+    fetchMagazineIssues().then((data) => {
+      if (data.length > 0) setIssues(data.map(mapApiIssue));
+      setLoadingIssues(false);
+    });
+  }, []);
+
+  const latest = issues[0];
+  const archives = issues.slice(1);
 
   return (
     <View style={styles.root}>
@@ -479,6 +515,11 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
       </LinearGradient>
 
       {tab === "kiosk" ? (
+        loadingIssues ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+          </View>
+        ) :
         <FlatList
           data={archives}
           keyExtractor={(item) => item.id}
