@@ -10,11 +10,13 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { FontFamily, FontSize, Spacing, Radius } from '@/theme';
-import { Button } from '@/components/common';
+import { FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
+
+const SUBSCRIPTION_BLUE = '#1B9DD9';
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -25,63 +27,122 @@ interface LoginScreenProps {
 
 const makeStyles = (C: ThemeColors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: C.background },
-  container: { flex: 1 },
-  content: {
-    paddingTop: Platform.OS === 'ios' ? 56 : 36,
-    paddingBottom: 48,
-    paddingHorizontal: Spacing['5'],
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing['4'],
+    paddingBottom: Spacing['3'],
+    backgroundColor: C.backgroundCard,
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderLight,
+  },
+  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+
+  content: { paddingBottom: 48 },
+
+  // Top section
+  topSection: { paddingHorizontal: Spacing['5'], paddingTop: Spacing['5'], gap: Spacing['4'], alignItems: 'center' },
+  pageTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize['2xl'],
+    color: C.textPrimary,
+    textAlign: 'center',
+  },
+  pageSubtitle: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: C.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+
+  // Stepper
+  stepper: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    gap: Spacing['2'],
+    alignItems: 'center',
+  },
+  stepPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: Spacing['2'],
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+  },
+  stepPillActive: { backgroundColor: SUBSCRIPTION_BLUE },
+  stepPillInactive: { backgroundColor: C.borderLight },
+  stepText: { fontFamily: FontFamily.bodySemiBold, fontSize: 11, flexShrink: 1, overflow: 'hidden' },
+  stepTextActive: { color: '#FFFFFF' },
+  stepTextInactive: { color: C.textMuted },
+  stepDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: C.textMuted, flexShrink: 0 },
+
+  // Form card
+  formCard: {
+    marginHorizontal: Spacing['4'],
+    marginTop: Spacing['4'],
+    backgroundColor: C.backgroundCard,
+    borderRadius: Radius.lg,
+    padding: Spacing['5'],
+    ...Shadows.card,
     gap: Spacing['4'],
   },
-  header: { marginBottom: Spacing['2'] },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  logoRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: Spacing['2'] },
-  logoSante: { fontFamily: FontFamily.logo, fontSize: FontSize['2xl'], color: C.textPrimary, letterSpacing: -0.5 },
-  logoAfrique: { fontFamily: FontFamily.logo, fontSize: FontSize['2xl'], color: C.primary, letterSpacing: -0.5 },
-  pageTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize['3xl'], color: C.textPrimary, letterSpacing: -0.5 },
-  pageSubtitle: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted, marginTop: -Spacing['2'] },
-  form: { gap: Spacing['4'], marginTop: Spacing['2'] },
   fieldWrapper: { gap: Spacing['1'] },
-  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  label: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.base, color: C.textPrimary },
-  forgotLink: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.primary, textDecorationLine: 'underline' },
+  label: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm, color: C.textPrimary },
   input: {
-    backgroundColor: C.backgroundCard,
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing['4'],
     paddingVertical: Spacing['3'],
     fontFamily: FontFamily.body,
-    fontSize: FontSize.md,
+    fontSize: FontSize.base,
     color: C.textPrimary,
-    height: 52,
+    height: 50,
+    backgroundColor: C.background,
   },
   inputError: { borderColor: C.error },
-  errorText: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.error },
+  errorText: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.error },
   passwordWrapper: { position: 'relative' },
-  passwordInput: { paddingRight: 48 },
-  eyeBtn: { position: 'absolute', right: Spacing['3'], top: 0, bottom: 0, justifyContent: 'center' },
-  loginBtn: { marginTop: Spacing['2'] },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: Spacing['3'] },
-  dividerLine: { flex: 1, height: 1, backgroundColor: C.border },
-  dividerText: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textMuted },
-  socialRow: { flexDirection: 'row', gap: Spacing['3'] },
-  socialBtn: {
-    flex: 1,
+  passwordInput: { paddingRight: 72 },
+  showBtn: { position: 'absolute', right: Spacing['3'], top: 0, bottom: 0, justifyContent: 'center' },
+  showBtnText: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm, color: C.textMuted },
+  forgotLink: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.primary },
+
+  loginBtn: {
+    backgroundColor: SUBSCRIPTION_BLUE,
+    borderRadius: Radius.full,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing['1'],
+  },
+  loginBtnDisabled: { opacity: 0.5 },
+  loginBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: '#FFFFFF' },
+
+  // Subscription card
+  subCard: {
+    marginHorizontal: Spacing['4'],
+    marginTop: Spacing['4'],
+    backgroundColor: C.backgroundCard,
+    borderRadius: Radius.lg,
+    padding: Spacing['5'],
+    ...Shadows.card,
+  },
+  subBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing['2'],
-    backgroundColor: C.backgroundCard,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing['3'],
+    backgroundColor: SUBSCRIPTION_BLUE,
+    borderRadius: Radius.full,
+    paddingVertical: 15,
   },
-  socialLabel: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.base, color: C.textPrimary },
-  registerRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: Spacing['2'] },
-  registerText: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted },
-  registerLink: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.primary },
+  subBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: '#FFFFFF' },
 });
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
@@ -90,6 +151,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onRegister,
   onBack,
 }) => {
+  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const styles = makeStyles(colors);
 
@@ -100,11 +162,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [emailError, setEmailError] = useState('');
 
   const validateEmail = (value: string) => {
-    setEmailError(!value.includes('@') ? 'Adresse email invalide' : '');
+    setEmailError(value.length > 0 && !value.includes('@') ? 'Adresse email invalide' : '');
   };
 
   const handleLogin = () => {
-    if (!email || !password) return;
+    if (!email || !password || loading) return;
     setLoading(true);
     setTimeout(() => { setLoading(false); onLogin(); }, 1200);
   };
@@ -113,31 +175,45 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.backgroundCard} />
+
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + Spacing['2'] }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Feather name="arrow-left" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }} />
+        <View style={{ width: 36 }} />
+      </View>
 
       <ScrollView
-        style={styles.container}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Feather name="arrow-left" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
+        {/* Titre + stepper */}
+        <View style={styles.topSection}>
+          <Text style={styles.pageTitle}>Connexion</Text>
+          <Text style={styles.pageSubtitle}>
+            Accédez à votre compte Santé Afrique pour retrouver vos abonnements et contenus.
+          </Text>
+
+          <View style={styles.stepper}>
+            <View style={[styles.stepPill, styles.stepPillActive]}>
+              <Feather name="check" size={11} color="#FFFFFF" />
+              <Text numberOfLines={1} style={[styles.stepText, styles.stepTextActive]}>Étape 1 — Email & mdp</Text>
+            </View>
+            <View style={[styles.stepPill, styles.stepPillInactive]}>
+              <View style={styles.stepDot} />
+              <Text numberOfLines={1} style={[styles.stepText, styles.stepTextInactive]}>Étape 2 — Vérification</Text>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.logoRow}>
-          <Text style={styles.logoSante}>santé </Text>
-          <Text style={styles.logoAfrique}>afrique</Text>
-        </View>
-
-        <Text style={styles.pageTitle}>Connexion</Text>
-        <Text style={styles.pageSubtitle}>Accédez à tout le contenu Santé Afrique</Text>
-
-        <View style={styles.form}>
+        {/* Formulaire */}
+        <View style={styles.formCard}>
           <View style={styles.fieldWrapper}>
-            <Text style={styles.label}>Adresse e-mail</Text>
+            <Text style={styles.label}>Adresse email</Text>
             <TextInput
               style={[styles.input, emailError ? styles.inputError : null]}
               value={email}
@@ -153,9 +229,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </View>
 
           <View style={styles.fieldWrapper}>
-            <View style={styles.labelRow}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={styles.label}>Mot de passe</Text>
-              <TouchableOpacity onPress={onForgotPassword}>
+              <TouchableOpacity onPress={onForgotPassword} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={styles.forgotLink}>Mot de passe oublié ?</Text>
               </TouchableOpacity>
             </View>
@@ -170,38 +246,36 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 returnKeyType="done"
                 onSubmitEditing={canSubmit ? handleLogin : undefined}
               />
-              <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPassword((v) => !v)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Feather name={showPassword ? 'eye-off' : 'eye'} size={20} color={colors.textMuted} />
+              <TouchableOpacity
+                style={styles.showBtn}
+                onPress={() => setShowPassword((v) => !v)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.showBtnText}>{showPassword ? 'Masquer' : 'Afficher'}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          <Button label="Se connecter" variant="primary" size="lg" fullWidth loading={loading} disabled={!canSubmit} onPress={handleLogin} style={styles.loginBtn} />
-        </View>
-
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>ou continuer avec</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <View style={styles.socialRow}>
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8}>
-            <Feather name="globe" size={20} color={colors.textSecondary} />
-            <Text style={styles.socialLabel}>Google</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8}>
-            <Feather name="facebook" size={20} color={colors.textSecondary} />
-            <Text style={styles.socialLabel}>Facebook</Text>
+          <TouchableOpacity
+            style={[styles.loginBtn, (!canSubmit || loading) && styles.loginBtnDisabled]}
+            onPress={handleLogin}
+            disabled={!canSubmit || loading}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.loginBtnText}>
+              {loading ? 'Connexion...' : 'Se connecter'}
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.registerRow}>
-          <Text style={styles.registerText}>Pas encore de compte ?</Text>
-          <TouchableOpacity onPress={onRegister}>
-            <Text style={styles.registerLink}> S'inscrire</Text>
+        {/* Bloc abonnement */}
+        <View style={styles.subCard}>
+          <TouchableOpacity style={styles.subBtn} onPress={onRegister} activeOpacity={0.85}>
+            <Feather name="star" size={16} color="#FFFFFF" />
+            <Text style={styles.subBtnText}>Voir les offres d'abonnement</Text>
           </TouchableOpacity>
         </View>
+
       </ScrollView>
     </KeyboardAvoidingView>
   );

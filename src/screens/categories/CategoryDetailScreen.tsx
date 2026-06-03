@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,60 +7,31 @@ import {
   StyleSheet,
   StatusBar,
   ListRenderItem,
+  ActivityIndicator,
 } from 'react-native';
 import { ArticleCard, SponsoredCard } from '@/components/common';
-import type { Article, ArticleType, Category } from '@/components/common';
+import type { Article, Category } from '@/components/common';
 import { Feather } from '@expo/vector-icons';
 import { FontFamily, FontSize, Spacing } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
+import { fetchArticlesByRubrique, formatDate, getImageUrl, resolveRubriqueSlug } from '@/services/api';
+import type { ApiArticle } from '@/services/api';
 
-const ARTICLES_BY_CATEGORY: Record<string, Article[]> = {
-  actualites: [
-    { id: 'a1', title: "Paludisme en Afrique de l'Ouest : l'OMS déploie un nouveau protocole de traitement pour 2026", category: 'actualites', articleType: 'actualite', date: '25 avr. 2026', hasAudio: true },
-    { id: 'a2', title: "Choléra au Sahel : bilan de l'épidémie et mesures d'urgence déployées par les gouvernements", category: 'actualites', articleType: 'actualite', date: '23 avr. 2026', hasAudio: false },
-    { id: 'a3', title: "L'OMS alerte sur la progression du mpox en Afrique centrale", category: 'actualites', articleType: 'actualite', date: '20 avr. 2026', hasAudio: true },
-    { id: 'a4', title: "Cancer du sein en Côte d'Ivoire : dépistage gratuit pour 10 000 femmes en 2026", category: 'actualites', articleType: 'actualite', date: '18 avr. 2026', hasAudio: false, isPremium: true },
-    { id: 'a5', title: 'Hypertension artérielle : le mal silencieux qui touche 40% des adultes africains', category: 'actualites', articleType: 'debat', date: '15 avr. 2026', hasAudio: true },
-  ],
-  sante_maternelle: [
-    { id: 'sm1', title: 'Dr Aminata Koné : "La mortalité maternelle reste notre priorité absolue en Afrique"', category: 'sante_maternelle', articleType: 'grand_entretien', date: '24 avr. 2026', hasAudio: true, isPremium: true },
-    { id: 'sm2', title: "Accouchement sans risque : les sages-femmes communautaires changent la donne au Mali", category: 'sante_maternelle', articleType: 'dossier', date: '22 avr. 2026', hasAudio: false },
-    { id: 'sm3', title: 'Allaitement maternel exclusif : pourquoi les taux restent faibles en Afrique urbaine', category: 'sante_maternelle', articleType: 'conseil_pratique', date: '19 avr. 2026', hasAudio: false },
-    { id: 'sm4', title: 'Dépression post-partum : la face cachée de la maternité en Afrique subsaharienne', category: 'sante_maternelle', articleType: 'tribune', date: '16 avr. 2026', hasAudio: true },
-    { id: 'sm5', title: "Fistule obstétricale : l'opération qui redonne une vie à 500 femmes par an au Cameroun", category: 'sante_maternelle', articleType: 'actualite', date: '12 avr. 2026', hasAudio: false, isPremium: true },
-  ],
-  vaccination: [
-    { id: 'v1', title: "Vaccination HPV : révolution silencieuse contre le cancer du col en Côte d'Ivoire", category: 'vaccination', articleType: 'vaccination', date: '21 avr. 2026', hasAudio: true },
-    { id: 'v2', title: 'ROR : pourquoi la rougeole repart à la hausse dans les zones de conflit africaines', category: 'vaccination', articleType: 'actualite', date: '18 avr. 2026', hasAudio: false },
-    { id: 'v3', title: 'Calendrier vaccinal 2026 : ce que chaque parent africain doit savoir', category: 'vaccination', articleType: 'conseil_pratique', date: '15 avr. 2026', hasAudio: true },
-    { id: 'v4', title: "Hésitation vaccinale en Afrique : comprendre pour mieux y répondre", category: 'vaccination', articleType: 'debat', date: '10 avr. 2026', hasAudio: false, isPremium: true },
-  ],
-  sante_mentale: [
-    { id: 'men1', title: '"La santé mentale est le défi invisible de l\'Afrique moderne" — Dr Aminata Koné', category: 'sante_mentale', articleType: 'grand_entretien', date: '20 avr. 2026', hasAudio: true, isPremium: true },
-    { id: 'men2', title: 'Burn-out des soignants en Afrique : une crise silencieuse et préoccupante', category: 'sante_mentale', articleType: 'dossier', date: '17 avr. 2026', hasAudio: false },
-    { id: 'men3', title: 'Dépression et culpabilité culturelle : briser les tabous en famille africaine', category: 'sante_mentale', articleType: 'tribune', date: '14 avr. 2026', hasAudio: false },
-    { id: 'men4', title: 'Accès aux soins psychiatriques en Afrique : 1 psychiatre pour 500 000 habitants', category: 'sante_mentale', articleType: 'debat', date: '10 avr. 2026', hasAudio: true, isPremium: true },
-  ],
-};
+function mapArticle(a: ApiArticle): Article {
+  return {
+    id: String(a.id),
+    title: a.title,
+    excerpt: a.excerpt,
+    category: a.category?.slug ?? a.category_name?.toLowerCase().replace(/\s+/g, '_') ?? 'actualites',
+    date: formatDate(a.published_at),
+    imageUrl: getImageUrl(a) ?? undefined,
+  };
+}
 
-const FALLBACK_ARTICLES: Article[] = [
-  { id: 'f1', title: "Santé en Afrique : les enjeux majeurs de 2026", category: 'actualites', articleType: 'actualite', date: '25 avr. 2026', hasAudio: true },
-  { id: 'f2', title: "Couverture santé universelle : où en est l'Afrique ?", category: 'les_odd', articleType: 'dossier', date: '22 avr. 2026', hasAudio: false },
-  { id: 'f3', title: "Les défis sanitaires des pays sahéliens en 2026", category: 'actualites', articleType: 'actualite', date: '18 avr. 2026', hasAudio: false },
-  { id: 'f4', title: 'Innovation en santé : les startups africaines à suivre', category: 'business_sante', articleType: 'actualite', date: '14 avr. 2026', hasAudio: false, isPremium: true },
-];
+const norm = (s: string) => s.toLowerCase().replace(/-/g, '_');
 
 type FeedItem = { type: 'article'; data: Article } | { type: 'sponsored' };
-
-const ARTICLE_TYPE_FILTERS: { value: ArticleType | 'all'; label: string }[] = [
-  { value: 'all', label: 'Tout' },
-  { value: 'actualite', label: 'Actualités' },
-  { value: 'grand_entretien', label: 'Entretien' },
-  { value: 'dossier', label: 'Dossier' },
-  { value: 'tribune', label: 'Tribune' },
-  { value: 'conseil_pratique', label: 'Conseils' },
-];
 
 interface CategoryDetailScreenProps {
   category: Category;
@@ -70,7 +41,7 @@ interface CategoryDetailScreenProps {
 }
 
 const makeStyles = (C: ThemeColors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.background },
+  container:       { flex: 1, backgroundColor: C.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -81,19 +52,14 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.borderLight,
   },
-  backBtn: { width: 36, alignItems: 'center' },
-  headerTitle: { flex: 1, fontFamily: FontFamily.headingBold, fontSize: FontSize.lg, color: C.textPrimary, textAlign: 'center' },
-  filterRow: { backgroundColor: C.backgroundCard, borderBottomWidth: 1, borderBottomColor: C.borderLight },
-  filterContent: { paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'], gap: Spacing['2'] },
-  filterChip: { paddingHorizontal: Spacing['3'], paddingVertical: 6, borderRadius: 999, backgroundColor: C.background, borderWidth: 1, borderColor: C.border },
-  filterChipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  filterText: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm, color: C.textSecondary },
-  filterTextActive: { color: C.white },
-  feed: { flex: 1 },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing['3'], paddingHorizontal: Spacing['8'] },
-  emptyEmoji: { fontSize: 48 },
-  emptyTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize.xl, color: C.textPrimary },
-  emptyText: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted, textAlign: 'center', lineHeight: FontSize.base * 1.5 },
+  backBtn:          { width: 36, alignItems: 'center' },
+  headerTitle:      { flex: 1, fontFamily: FontFamily.headingBold, fontSize: FontSize.lg, color: C.textPrimary, textAlign: 'center' },
+  feed:             { flex: 1 },
+  emptyState:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing['3'], paddingHorizontal: Spacing['8'] },
+  emptyEmoji:       { fontSize: 48 },
+  emptyTitle:       { fontFamily: FontFamily.headingBold, fontSize: FontSize.xl, color: C.textPrimary },
+  emptyText:        { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted, textAlign: 'center', lineHeight: FontSize.base * 1.5 },
+  footer:           { paddingVertical: Spacing['4'], alignItems: 'center' },
 });
 
 export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
@@ -104,29 +70,85 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
 }) => {
   const { colors, isDark } = useTheme();
   const styles = makeStyles(colors);
-  const [activeFilter, setActiveFilter] = useState<ArticleType | 'all'>('all');
 
-  const rawArticles = ARTICLES_BY_CATEGORY[category] ?? FALLBACK_ARTICLES;
+  const [rawArticles, setRawArticles]   = useState<Article[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [loadingMore, setLoadingMore]   = useState(false);
+  const [hasMore, setHasMore]           = useState(false);
+  const [currentPage, setCurrentPage]   = useState(1);
 
-  const articles = useMemo(
-    () => activeFilter === 'all' ? rawArticles : rawArticles.filter((a) => a.articleType === activeFilter),
-    [rawArticles, activeFilter],
-  );
+  // Vrai slug API résolu une fois par rubrique
+  const realSlugRef = useRef('');
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setRawArticles([]);
+    setCurrentPage(1);
+    setHasMore(false);
+
+    async function fetchFirst() {
+      const slug = resolveRubriqueSlug(category);
+      realSlugRef.current = slug;
+      // Rubrique pas encore disponible dans l'API
+      if (!slug) { setLoading(false); return; }
+      const res = await fetchArticlesByRubrique(slug.replace(/-/g, '_'), 1);
+      if (!mounted) return;
+      if (res?.data?.length) {
+        const target = norm(slug);
+        // Filtre strict : on n'affiche QUE les articles de cette rubrique
+        const matched = res.data.filter(a => norm(a.category?.slug ?? '') === target);
+        setRawArticles(matched.map(mapArticle));
+        setHasMore((res.current_page ?? 1) < (res.last_page ?? 1));
+        setCurrentPage(1);
+      }
+      setLoading(false);
+    }
+
+    fetchFirst();
+    return () => { mounted = false; };
+  }, [category, categoryTitle]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || !realSlugRef.current) return;
+    setLoadingMore(true);
+    const next = currentPage + 1;
+    const res = await fetchArticlesByRubrique(realSlugRef.current.replace(/-/g, '_'), next);
+    if (res?.data?.length) {
+      const target = norm(realSlugRef.current);
+      const matched = res.data.filter(a => norm(a.category?.slug ?? '') === target);
+      setRawArticles(prev => [...prev, ...matched.map(mapArticle)]);
+      setHasMore(next < (res.last_page ?? 1));
+      setCurrentPage(next);
+    } else {
+      setHasMore(false);
+    }
+    setLoadingMore(false);
+  }, [loadingMore, hasMore, currentPage]);
 
   const feedItems = useMemo<FeedItem[]>(() => {
     const items: FeedItem[] = [];
-    articles.forEach((article, i) => {
+    rawArticles.forEach((article, i) => {
       if (i > 0 && i % 5 === 0) items.push({ type: 'sponsored' });
       items.push({ type: 'article', data: article });
     });
     return items;
-  }, [articles]);
+  }, [rawArticles]);
 
   const renderItem: ListRenderItem<FeedItem> = ({ item }) => {
     if (item.type === 'sponsored') {
       return <SponsoredCard title="Les solutions de santé digitale au service des populations africaines" sponsor="OMS Afrique" />;
     }
     return <ArticleCard article={item.data} onPress={() => onArticlePress(item.data.id)} />;
+  };
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.footer}>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    );
   };
 
   return (
@@ -141,39 +163,32 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
         <View style={styles.backBtn} />
       </View>
 
-      <View style={styles.filterRow}>
-        <FlatList
-          data={ARTICLE_TYPE_FILTERS}
-          keyExtractor={(item) => item.value}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContent}
-          renderItem={({ item: filter }) => (
-            <TouchableOpacity
-              style={[styles.filterChip, activeFilter === filter.value && styles.filterChipActive]}
-              onPress={() => setActiveFilter(filter.value)}
-            >
-              <Text style={[styles.filterText, activeFilter === filter.value && styles.filterTextActive]}>
-                {filter.label}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
-      </View>
-
-      {articles.length === 0 ? (
+      {loading ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyEmoji}>📭</Text>
-          <Text style={styles.emptyTitle}>Aucun article</Text>
-          <Text style={styles.emptyText}>Aucun article ne correspond à ce filtre pour l'instant.</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : rawArticles.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyEmoji}>🔧</Text>
+          <Text style={styles.emptyTitle}>Bientôt disponible</Text>
+          <Text style={styles.emptyText}>
+            {!realSlugRef.current
+              ? 'Cette rubrique sera disponible prochainement sur l\'application.'
+              : 'Aucun article ne correspond à ce filtre pour l\'instant.'}
+          </Text>
         </View>
       ) : (
         <FlatList
           data={feedItems}
-          keyExtractor={(item, index) => item.type === 'article' ? `art-${item.data.id}` : `sp-${index}`}
+          keyExtractor={(item, index) =>
+            item.type === 'article' ? `art-${item.data.id}` : `sp-${index}`
+          }
           renderItem={renderItem}
           showsVerticalScrollIndicator={false}
           style={styles.feed}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={renderFooter}
         />
       )}
     </View>

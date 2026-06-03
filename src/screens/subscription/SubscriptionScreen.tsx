@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,24 +6,29 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { Colors, FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
+import { FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
 
+const BRAND = '#1B9DD9';
+const RECOMMENDED_BORDER = '#7dd3f8';
+const RECOMMENDED_BG = '#e8f7fd';
+const RECOMMENDED_TEXT = BRAND;
+
 interface Plan {
   id: string;
+  tag: string;
   name: string;
-  subtitle: string;
   priceYear: string;
   priceMonth: string;
-  badge?: string;
-  color: string;
+  description: string;
   features: string[];
-  cta: string;
+  recommended?: boolean;
+  ctaColor: string;
 }
 
 interface SubscriptionScreenProps {
@@ -34,229 +39,301 @@ interface SubscriptionScreenProps {
 
 const PLANS: Plan[] = [
   {
-    id: 'digital',
-    name: 'Numérique',
-    subtitle: 'Accès complet en ligne',
-    priceYear: '15 000 FCFA',
-    priceMonth: '1 250 FCFA',
-    badge: 'Le plus populaire',
-    color: Colors.primary,
-    features: [
-      'Accès illimité à tous les articles',
-      'Édition numérique du magazine (6 n°/an)',
-      'Archives complètes en ligne',
-      'Lecture hors connexion (50 articles)',
-      'Alertes santé en temps réel',
-      'Accès multi-appareils',
-    ],
-    cta: 'Choisir Numérique',
+    id: 'premium',
+    tag: 'ABONNEMENT ANNUEL PREMIUM',
+    name: 'Abonnement Premium Annuel',
+    priceYear: '90 000 FCFA',
+    priceMonth: '≈ 7500 FCFA / mois',
+    description: 'Accès intégral à notre site + magazine version papier + livraison à votre adresse',
+    features: ['6 numéros / an', 'Articles premium et dossiers thématiques', 'Lecture sur tous vos appareils'],
+    recommended: true,
+    ctaColor: BRAND,
   },
   {
     id: 'print_digital',
-    name: 'Papier + Numérique',
-    subtitle: 'Le meilleur des deux formats',
+    tag: 'ÉDITION PAPIER + NUMÉRIQUE (ANNUEL)',
+    name: 'Abonnement Papier + Numérique Annuel',
     priceYear: '60 000 FCFA',
-    priceMonth: '5 000 FCFA',
-    color: '#1E3A5F',
-    features: [
-      'Tout le plan Numérique',
-      'Magazine papier livré chez vous',
-      '6 numéros par an',
-      'Dossiers thématiques imprimés',
-      'Facture envoyée par email',
-    ],
-    cta: 'Choisir Papier + Numérique',
+    priceMonth: '≈ 5000 FCFA / mois',
+    description: 'Magazine version papier + accès au site internet',
+    features: ['6 numéros / an', 'Articles premium et dossiers thématiques', 'Lecture sur tous vos appareils'],
+    ctaColor: BRAND,
   },
   {
-    id: 'premium',
-    name: 'Premium',
-    subtitle: 'L\'expérience complète',
-    priceYear: '90 000 FCFA',
-    priceMonth: '7 500 FCFA',
-    color: '#7C3AED',
-    features: [
-      'Tout le plan Papier + Numérique',
-      'Livraison prioritaire incluse',
-      'Accès aux événements partenaires',
-      'Newsletter exclusive hebdomadaire',
-      'Support client dédié',
-      'Facture envoyée par email',
-    ],
-    cta: 'Choisir Premium',
+    id: 'digital',
+    tag: 'ÉDITION NUMÉRIQUE (ANNUEL)',
+    name: 'Abonnement Numérique Annuel',
+    priceYear: '15 000 FCFA',
+    priceMonth: '≈ 1250 FCFA / mois',
+    description: 'Édition numérique + archives',
+    features: ['6 numéros / an', 'Articles premium et dossiers thématiques', 'Lecture sur tous vos appareils'],
+    ctaColor: BRAND,
   },
 ];
 
-const PAYMENT_METHODS: { icon: React.ComponentProps<typeof Feather>['name']; label: string }[] = [
-  { icon: 'smartphone', label: 'Mobile Money' },
-  { icon: 'credit-card', label: 'Visa' },
-  { icon: 'credit-card', label: 'Mastercard' },
-];
 
-const makeCardStyles = (C: ThemeColors) => StyleSheet.create({
-  wrapper: {
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.background },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing['4'],
+    paddingBottom: Spacing['3'],
+    backgroundColor: C.backgroundCard,
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderLight,
+  },
+  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+
+  // Hero
+  hero: {
+    backgroundColor: BRAND,
+    marginHorizontal: Spacing['4'],
+    marginTop: Spacing['4'],
+    borderRadius: Radius.lg,
+    padding: Spacing['5'],
+  },
+  heroTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.xl,
+    color: '#1C1C1E',
+    lineHeight: 30,
+    marginBottom: Spacing['2'],
+  },
+  heroSub: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: '#1C1C1E',
+    lineHeight: 22,
+    marginBottom: Spacing['3'],
+    opacity: 0.85,
+  },
+  heroChecks: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing['3'] },
+  heroCheck: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  heroCheckText: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: '#1C1C1E', opacity: 0.9 },
+
+  // Plans
+  plansSection: { paddingHorizontal: Spacing['4'], paddingTop: Spacing['6'] },
+  plansSectionTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.lg,
+    color: C.textPrimary,
+    textAlign: 'center',
+    marginBottom: Spacing['4'],
+  },
+  planCard: {
     backgroundColor: C.backgroundCard,
     borderRadius: Radius.lg,
     borderWidth: 1.5,
     borderColor: C.borderLight,
     padding: Spacing['4'],
-    gap: Spacing['3'],
+    marginBottom: Spacing['3'],
     ...Shadows.card,
   },
-  wrapperSelected: {
-    borderColor: C.primary,
-    backgroundColor: C.backgroundCard,
-  },
-  badge: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  planCardRecommended: { borderColor: RECOMMENDED_BORDER },
+  recommendedWrap: { alignItems: 'center', marginBottom: Spacing['3'] },
+  recommendedBadge: {
+    backgroundColor: RECOMMENDED_BG,
     borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: RECOMMENDED_BORDER,
     paddingHorizontal: Spacing['3'],
-    paddingVertical: 4,
+    paddingVertical: 3,
+  },
+  recommendedText: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.xs, color: RECOMMENDED_TEXT },
+  planTag: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: 10,
+    color: C.textMuted,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
     marginBottom: Spacing['1'],
   },
-  badgeText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.xs, color: C.white },
-  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing['3'] },
-  colorDot: { width: 10, height: 10, borderRadius: 5 },
-  titleBlock: { flex: 1 },
-  name: { fontFamily: FontFamily.headingBold, fontSize: FontSize.lg, color: C.textPrimary },
-  subtitle: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textMuted, marginTop: 1 },
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: C.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+  planName: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.base,
+    color: C.textPrimary,
+    lineHeight: 24,
+    marginBottom: Spacing['2'],
   },
-  radioDot: { width: 10, height: 10, borderRadius: 5 },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap' },
-  priceYear: { fontFamily: FontFamily.headingBold, fontSize: FontSize['2xl'], color: C.textPrimary },
-  priceSuffix: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted },
-  priceMonth: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textMuted },
-  features: { gap: Spacing['2'] },
-  featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing['2'] },
-  featureText: { flex: 1, fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textSecondary, lineHeight: FontSize.sm * 1.5 },
-  ctaBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing['2'],
+  planPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3, marginBottom: 2 },
+  planPrice: { fontFamily: FontFamily.headingBold, fontSize: 26, color: BRAND },
+  planPriceSuffix: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted },
+  planPriceMonth: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.xs,
+    color: C.textMuted,
+    marginBottom: Spacing['3'],
+  },
+  planDescription: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: C.textSecondary,
+    lineHeight: 20,
+    marginBottom: Spacing['3'],
+  },
+  planFeatures: { gap: Spacing['2'], marginBottom: Spacing['4'] },
+  planFeatureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing['2'] },
+  planFeatureText: { flex: 1, fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textSecondary, lineHeight: 20 },
+  planCta: {
     borderRadius: Radius.sm,
-    paddingVertical: Spacing['3'],
-    marginTop: Spacing['1'],
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  ctaText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.white },
-});
+  planCtaText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: '#FFFFFF' },
 
-const PlanCard: React.FC<{
-  plan: Plan;
-  selected: boolean;
-  onSelect: () => void;
-  onSubscribe: () => void;
-}> = ({ plan, selected, onSelect, onSubscribe }) => {
-  const { colors } = useTheme();
-  const cardS = makeCardStyles(colors);
-  return (
-    <TouchableOpacity
-      style={[cardS.wrapper, selected && cardS.wrapperSelected]}
-      onPress={onSelect}
-      activeOpacity={0.85}
-    >
-      {plan.badge && (
-        <View style={[cardS.badge, { backgroundColor: plan.color }]}>
-          <Feather name="star" size={11} color={colors.white} />
-          <Text style={cardS.badgeText}>{plan.badge}</Text>
-        </View>
-      )}
-
-      <View style={cardS.header}>
-        <View style={[cardS.colorDot, { backgroundColor: plan.color }]} />
-        <View style={cardS.titleBlock}>
-          <Text style={cardS.name}>{plan.name}</Text>
-          <Text style={cardS.subtitle}>{plan.subtitle}</Text>
-        </View>
-        <View style={[cardS.radio, selected && { borderColor: plan.color }]}>
-          {selected && <View style={[cardS.radioDot, { backgroundColor: plan.color }]} />}
-        </View>
-      </View>
-
-      <View style={cardS.priceRow}>
-        <Text style={cardS.priceYear}>{plan.priceYear}</Text>
-        <Text style={cardS.priceSuffix}> / an</Text>
-        <Text style={cardS.priceMonth}>  soit {plan.priceMonth}/mois</Text>
-      </View>
-
-      <View style={cardS.features}>
-        {plan.features.map((f) => (
-          <View key={f} style={cardS.featureRow}>
-            <Feather name="check" size={14} color={plan.color} />
-            <Text style={cardS.featureText}>{f}</Text>
-          </View>
-        ))}
-      </View>
-
-      {selected && (
-        <TouchableOpacity
-          style={[cardS.ctaBtn, { backgroundColor: plan.color }]}
-          onPress={onSubscribe}
-          activeOpacity={0.85}
-        >
-          <Text style={cardS.ctaText}>{plan.cta}</Text>
-          <Feather name="arrow-right" size={16} color={colors.white} />
-        </TouchableOpacity>
-      )}
-    </TouchableOpacity>
-  );
-};
-
-const makeStyles = (C: ThemeColors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.background },
-  header: {
+  // Payment bar
+  paymentBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginHorizontal: Spacing['4'],
+    marginTop: Spacing['1'],
+    paddingVertical: Spacing['3'],
     paddingHorizontal: Spacing['4'],
+    borderWidth: 1,
+    borderColor: C.borderLight,
+    borderRadius: Radius.md,
+    backgroundColor: C.backgroundCard,
+    gap: Spacing['2'],
+  },
+  paymentBarText: { flex: 1, fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textSecondary },
+  paymentChips: { flexDirection: 'row', gap: Spacing['1'] },
+  paymentChip: {
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  paymentChipText: { fontFamily: FontFamily.bodyBold, fontSize: 9, color: C.textMuted },
+
+  // Why section
+  whySection: {
+    marginTop: Spacing['5'],
+    paddingVertical: Spacing['5'],
+    paddingHorizontal: Spacing['4'],
+    backgroundColor: C.borderLight,
+    gap: Spacing['4'],
+  },
+  whySectionTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.lg,
+    color: C.textPrimary,
+    textAlign: 'center',
+  },
+  whyGrid: { gap: Spacing['3'] },
+  whyCard: {
+    backgroundColor: C.backgroundCard,
+    borderRadius: Radius.md,
+    padding: Spacing['4'],
+    ...Shadows.card,
+  },
+  whyCardTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.sm,
+    color: C.textPrimary,
+    marginBottom: 4,
+  },
+  whyCardDesc: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textSecondary, lineHeight: 20 },
+
+  // Unique content
+  uniqueSection: {
+    marginTop: Spacing['5'],
+    paddingVertical: Spacing['5'],
+    paddingHorizontal: Spacing['4'],
+    backgroundColor: '#D0D0D0',
+    alignItems: 'center',
+  },
+  uniqueCard: {
+    backgroundColor: C.backgroundCard,
+    borderRadius: Radius.lg,
+    padding: Spacing['5'],
+    alignItems: 'center',
+    maxWidth: '90%',
+    ...Shadows.card,
+  },
+  uniqueTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.base,
+    color: C.textPrimary,
+    textAlign: 'center',
+    marginBottom: Spacing['2'],
+  },
+  uniqueDesc: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: C.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+
+  // Help section
+  helpSection: {
+    paddingHorizontal: Spacing['4'],
+    paddingTop: Spacing['5'],
     paddingBottom: Spacing['4'],
     gap: Spacing['3'],
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
-  headerLogo: { fontFamily: FontFamily.logo, fontSize: FontSize.xl, color: 'rgba(255,255,255,0.85)', letterSpacing: -0.3 },
-  headerLogoW: { color: C.white },
-  headerTagline: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.75)' },
-  content: { paddingHorizontal: Spacing['4'], paddingTop: Spacing['4'], gap: Spacing['4'] },
-  intro: { alignItems: 'center', gap: Spacing['1'] },
-  introTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize.xl, color: C.textPrimary, textAlign: 'center' },
-  introSub: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textMuted, textAlign: 'center' },
-  plans: { gap: Spacing['3'] },
-  paymentBlock: {
+  helpTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.lg,
+    color: C.textPrimary,
+    textAlign: 'center',
+    marginBottom: Spacing['1'],
+  },
+  helpRow: { flexDirection: 'row', gap: Spacing['3'] },
+  helpFaqCard: {
+    flex: 1,
     backgroundColor: C.backgroundCard,
     borderRadius: Radius.md,
+    padding: Spacing['3'],
     borderWidth: 1,
     borderColor: C.borderLight,
-    padding: Spacing['4'],
-    gap: Spacing['3'],
+    gap: Spacing['2'],
   },
-  paymentTitle: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.xs, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  paymentRow: { flexDirection: 'row', gap: Spacing['2'], flexWrap: 'wrap' },
-  paymentChip: {
-    flexDirection: 'row',
+  helpFaqTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize.sm, color: C.textPrimary },
+  helpFaqItem: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textSecondary, lineHeight: 18 },
+  helpInfoCard: {
+    flex: 1,
+    backgroundColor: C.backgroundCard,
+    borderRadius: Radius.md,
+    padding: Spacing['3'],
+    borderWidth: 1,
+    borderColor: C.borderLight,
+  },
+  helpInfoTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize.sm, color: C.textPrimary, marginBottom: Spacing['2'] },
+  helpInfoText: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textSecondary, lineHeight: 18 },
+
+  // Service client
+  serviceCard: {
+    backgroundColor: C.backgroundCard,
+    borderRadius: Radius.lg,
+    padding: Spacing['5'],
+    borderWidth: 1,
+    borderColor: C.borderLight,
     alignItems: 'center',
     gap: Spacing['2'],
-    backgroundColor: C.background,
-    borderRadius: Radius.sm,
+  },
+  serviceTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize.sm, color: C.textPrimary },
+  serviceSchedule: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textMuted },
+  serviceContacts: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', gap: 6 },
+  serviceLink: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm, color: '#1B9DD9' },
+  serviceSeparator: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textMuted },
+  servicePayments: { flexDirection: 'row', gap: Spacing['2'], marginTop: 4 },
+  servicePaymentChip: {
     borderWidth: 1,
     borderColor: C.border,
-    paddingHorizontal: Spacing['3'],
-    paddingVertical: Spacing['2'],
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
-  paymentLabel: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textSecondary },
-  loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  loginText: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted },
-  loginLink: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.primary },
-  legal: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textDisabled, textAlign: 'center', lineHeight: FontSize.xs * 1.6 },
+  servicePaymentText: { fontFamily: FontFamily.bodyBold, fontSize: 10, color: C.textMuted },
+
+  loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4 },
+  loginText: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textMuted },
+  loginLink: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.sm, color: '#1B9DD9' },
 });
 
 export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
@@ -265,86 +342,141 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
   onLogin,
 }) => {
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const styles = makeStyles(colors);
-  const [selectedPlan, setSelectedPlan] = useState('digital');
-
-  const handleSubscribe = (planId: string) => {
-    onSubscribe?.(planId);
-  };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.backgroundCard}
+      />
 
-      <LinearGradient
-        colors={[Colors.primary, Colors.primaryDark]}
-        style={[styles.header, { paddingTop: insets.top + Spacing['2'] }]}
-      >
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + Spacing['2'] }]}>
         {onBack && (
           <TouchableOpacity
             style={styles.backBtn}
             onPress={onBack}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Feather name="arrow-left" size={24} color={colors.white} />
+            <Feather name="arrow-left" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
         )}
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerLogo}>
-            santé <Text style={styles.headerLogoW}>afrique</Text>
+        <View style={{ flex: 1 }} />
+        {onBack && <View style={{ width: 36 }} />}
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+
+        {/* Hero vert */}
+        <View style={styles.hero}>
+          <Text style={styles.heroTitle}>Abonnez-vous à Santé Afrique</Text>
+          <Text style={styles.heroSub}>
+            Le média santé de référence en Afrique : dossiers, enquêtes, interviews et retours d'expérience utiles pour décider et agir.
           </Text>
-          <Text style={styles.headerTagline}>Choisissez votre formule</Text>
-        </View>
-        <View style={{ width: onBack ? 36 : 0 }} />
-      </LinearGradient>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
-      >
-        <View style={styles.intro}>
-          <Text style={styles.introTitle}>Accès illimité à Santé Afrique</Text>
-          <Text style={styles.introSub}>
-            Paiement sécurisé · Résiliation libre · Facture par email
-          </Text>
-        </View>
-
-        <View style={styles.plans}>
-          {PLANS.map((plan) => (
-            <PlanCard
-              key={plan.id}
-              plan={plan}
-              selected={selectedPlan === plan.id}
-              onSelect={() => setSelectedPlan(plan.id)}
-              onSubscribe={() => handleSubscribe(plan.id)}
-            />
-          ))}
-        </View>
-
-        <View style={styles.paymentBlock}>
-          <Text style={styles.paymentTitle}>Paiement accepté</Text>
-          <View style={styles.paymentRow}>
-            {PAYMENT_METHODS.map((m, i) => (
-              <View key={i} style={styles.paymentChip}>
-                <Feather name={m.icon} size={16} color={colors.textSecondary} />
-                <Text style={styles.paymentLabel}>{m.label}</Text>
+          <View style={styles.heroChecks}>
+            {['Accès illimité aux archives', '6 numéros numériques / an', 'Lecture multi-supports'].map((item) => (
+              <View key={item} style={styles.heroCheck}>
+                <Feather name="check" size={13} color="#1C1C1E" />
+                <Text style={styles.heroCheckText}>{item}</Text>
               </View>
             ))}
           </View>
         </View>
 
-        <View style={styles.loginRow}>
-          <Text style={styles.loginText}>Déjà abonné ?</Text>
-          <TouchableOpacity onPress={onLogin}>
-            <Text style={styles.loginLink}> Se connecter</Text>
-          </TouchableOpacity>
+        {/* Plans */}
+        <View style={styles.plansSection}>
+          <Text style={styles.plansSectionTitle}>Choisissez la formule qui vous convient</Text>
+
+          {PLANS.map((plan) => (
+            <View key={plan.id} style={[styles.planCard, plan.recommended && styles.planCardRecommended]}>
+
+              {plan.recommended && (
+                <View style={styles.recommendedWrap}>
+                  <View style={styles.recommendedBadge}>
+                    <Text style={styles.recommendedText}>Recommandé</Text>
+                  </View>
+                </View>
+              )}
+
+              <Text style={styles.planTag}>{plan.tag}</Text>
+              <Text style={styles.planName}>{plan.name}</Text>
+
+              <View style={styles.planPriceRow}>
+                <Text style={styles.planPrice}>{plan.priceYear}</Text>
+                <Text style={styles.planPriceSuffix}> / an</Text>
+              </View>
+              <Text style={styles.planPriceMonth}>soit {plan.priceMonth}</Text>
+
+              <Text style={styles.planDescription}>{plan.description}</Text>
+
+              <View style={styles.planFeatures}>
+                {plan.features.map((f) => (
+                  <View key={f} style={styles.planFeatureRow}>
+                    <Feather name="check" size={14} color={BRAND} />
+                    <Text style={styles.planFeatureText}>{f}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={[styles.planCta, { backgroundColor: plan.ctaColor }]}
+                onPress={() => onSubscribe?.(plan.id)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.planCtaText}>S'abonner</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
         </View>
 
-        <Text style={styles.legal}>
-          En vous abonnant, vous acceptez nos conditions générales d'utilisation.
-          Abonnement annuel reconduit automatiquement. Résiliation possible à tout moment.
-        </Text>
+        {/* Barre paiement */}
+        <View style={styles.paymentBar}>
+          <Feather name="check" size={14} color={BRAND} />
+          <Text style={styles.paymentBarText}>Paiement sécurisé • Facture envoyée par email</Text>
+          <View style={styles.paymentChips}>
+            {['Wave', 'VISA', 'MC'].map((m) => (
+              <View key={m} style={styles.paymentChip}>
+                <Text style={styles.paymentChipText}>{m}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Service client */}
+        <View style={styles.helpSection}>
+          {/* Service client */}
+          <View style={styles.serviceCard}>
+            <Text style={styles.serviceTitle}>Service client</Text>
+            <Text style={styles.serviceSchedule}>Lundi – Vendredi, 9h00 – 18h00 (GMT)</Text>
+            <View style={styles.serviceContacts}>
+              <TouchableOpacity onPress={() => Linking.openURL('mailto:infos@santeafrique.net')}>
+                <Text style={styles.serviceLink}>infos@santeafrique.net</Text>
+              </TouchableOpacity>
+              <Text style={styles.serviceSeparator}>•</Text>
+              <TouchableOpacity onPress={() => Linking.openURL('tel:+2250714565076')}>
+                <Text style={styles.serviceLink}>+225 07 14 56 50 76</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.servicePayments}>
+              {['Wave', 'VISA', 'MasterCard'].map((m) => (
+                <View key={m} style={styles.servicePaymentChip}>
+                  <Text style={styles.servicePaymentText}>{m}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Déjà abonné */}
+          <View style={styles.loginRow}>
+            <Text style={styles.loginText}>Déjà abonné ?</Text>
+            <TouchableOpacity onPress={onLogin}>
+              <Text style={styles.loginLink}>Se connecter</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
       </ScrollView>
     </View>
   );

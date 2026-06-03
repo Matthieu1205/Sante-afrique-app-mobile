@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { requestPushPermissions, getUnreadCount } from './src/services/notifications';
+import { fetchArticles } from './src/services/api';
 import { Feather } from '@expo/vector-icons';
 
-const MENU_LOGO = require('./src/assets/icon.png');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const MENU_LOGO = require('./src/assets/icon.png') as number;
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import {
@@ -40,6 +43,7 @@ import { AboutScreen } from './src/screens/about/AboutScreen';
 import { SubscriptionScreen } from './src/screens/subscription/SubscriptionScreen';
 import { JobsScreen } from './src/screens/jobs/JobsScreen';
 import { PartnersScreen } from './src/screens/partners/PartnersScreen';
+import { KitMediaScreen } from './src/screens/partners/KitMediaScreen';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import type { Category } from './src/components/common';
 
@@ -66,7 +70,8 @@ type Screen =
   | 'about'
   | 'subscription'
   | 'jobs'
-  | 'partners';
+  | 'partners'
+  | 'kit-media';
 
 interface NavState {
   screen: Screen;
@@ -84,14 +89,13 @@ interface NavState {
 type TabDef = { id: Screen; icon: React.ComponentProps<typeof Feather>['name']; label: string };
 
 const TABS: TabDef[] = [
-  { id: 'home',      icon: 'home',      label: 'Accueil'   },
-  { id: 'magazine',  icon: 'book-open', label: 'Magazine'  },
-  { id: 'search',    icon: 'search',    label: 'Recherche' },
-  { id: 'jobs',      icon: 'briefcase', label: 'Emplois'   },
-  { id: 'menu',      icon: 'menu',      label: 'Menu'      },
+  { id: 'home',      icon: 'home',      label: 'Accueil'  },
+  { id: 'magazine',  icon: 'book-open', label: 'Magazine' },
+  { id: 'jobs',      icon: 'briefcase', label: 'Emplois'  },
+  { id: 'menu',      icon: 'menu',      label: 'Menu'     },
 ];
 
-const MAIN_SCREENS: Screen[] = ['home', 'magazine', 'search', 'jobs', 'menu'];
+const MAIN_SCREENS: Screen[] = ['home', 'magazine', 'jobs', 'menu'];
 
 const BottomTabBar: React.FC<{
   active: Screen;
@@ -162,6 +166,15 @@ const tabStyles = StyleSheet.create({
 function AppContent() {
   const [nav, setNav] = useState<NavState>({ screen: 'splash' });
   const { colors, toggleTheme, isDark } = useTheme();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    requestPushPermissions();
+    fetchArticles(1).then((res) => {
+      const ids = (res?.data ?? []).slice(0, 20).map((a) => String(a.id));
+      getUnreadCount(ids).then(setUnreadCount);
+    });
+  }, []);
 
   const [fontsLoaded] = useFonts({
     Nunito_900Black,
@@ -196,6 +209,7 @@ function AppContent() {
             onArticlePress={(id) => go('article-detail', { articleId: id, fromScreen: 'home' })}
             onSearchPress={() => go('search')}
             onNotificationPress={() => go('notifications')}
+            notificationCount={unreadCount}
           />
         );
 
@@ -207,6 +221,7 @@ function AppContent() {
             }
             onSearchPress={() => go('search')}
             onBack={() => go('menu')}
+            notificationCount={unreadCount}
           />
         );
 
@@ -226,7 +241,12 @@ function AppContent() {
           <CategoryDetailScreen
             category={params.category}
             categoryTitle={params.categoryTitle ?? ''}
-            onArticlePress={(id) => go('article-detail', { articleId: id, fromScreen: 'category-detail' })}
+            onArticlePress={(id) => go('article-detail', {
+              articleId: id,
+              fromScreen: 'category-detail',
+              category: params.category,
+              categoryTitle: params.categoryTitle,
+            })}
             onBack={() => go('categories')}
           />
         ) : null;
@@ -234,8 +254,24 @@ function AppContent() {
       case 'article-detail':
         return (
           <ArticleDetailScreen
-            onBack={() => go(params?.fromScreen ?? 'home')}
-            onArticlePress={(id) => go('article-detail', { articleId: id })}
+            articleId={params?.articleId}
+            onBack={() => {
+              const from = params?.fromScreen ?? 'home';
+              if (from === 'category-detail') {
+                go('category-detail', {
+                  category: params?.category,
+                  categoryTitle: params?.categoryTitle,
+                });
+              } else {
+                go(from);
+              }
+            }}
+            onArticlePress={(id) => go('article-detail', {
+              articleId: id,
+              fromScreen: params?.fromScreen,
+              category: params?.category,
+              categoryTitle: params?.categoryTitle,
+            })}
           />
         );
 
@@ -279,7 +315,7 @@ function AppContent() {
         return (
           <LoginScreen
             onLogin={() => go('home')}
-            onRegister={() => go('register')}
+            onRegister={() => go('subscription')}
             onForgotPassword={() => go('forgot-password')}
             onBack={() => go('gateway')}
           />
@@ -314,6 +350,7 @@ function AppContent() {
           <NotificationsScreen
             onBack={() => go(params?.fromScreen ?? 'home')}
             onArticlePress={(id) => go('article-detail', { articleId: id })}
+            onUnreadChange={setUnreadCount}
           />
         );
 
@@ -349,8 +386,12 @@ function AppContent() {
           <PartnersScreen
             onBack={() => go('menu')}
             onJobsPress={() => go('jobs')}
+            onKitMediaPress={() => go('kit-media')}
           />
         );
+
+      case 'kit-media':
+        return <KitMediaScreen onBack={() => go('partners')} />;
 
       case 'about':
         return <AboutScreen onBack={() => go('menu')} />;

@@ -1,337 +1,389 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, StatusBar, Linking,
+  StyleSheet, StatusBar, Linking, ActivityIndicator,
 } from 'react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FontFamily, FontSize, Spacing, Radius } from '@/theme';
+import { Asset } from 'expo-asset';
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
+import { FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
 
-const WHATSAPP_NUMBER = '+2250714565076';
-const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER.replace(/\D/g, '')}`;
-const KIT_MEDIA_URL = 'https://santeafrique.net/partenaires';
+const KIT_PDF = require('../../assets/MbJv5u8JpG6MGak14NHFYhKLsJW0OIveLzuBDLKr.pdf') as number;
 
-const VALUE_PROPS = [
+const WHATSAPP_URL = 'https://wa.me/2250714565076?text=Bonjour%2C%20je%20souhaite%20discuter%20d%27un%20partenariat%20avec%20Sant%C3%A9%20Afrique.';
+const WHATSAPP_GREEN = '#25D366';
+
+const VALUE_CARDS = [
   {
-    icon: 'target' as const,
     title: 'Audience ciblée santé',
-    desc: 'Professionnels de santé, décideurs et grand public qualifié à travers l\'Afrique.',
+    desc: 'Professionnels de santé, décideurs, et grand public qualifié.',
   },
   {
-    icon: 'layers' as const,
     title: 'Formats & brand content',
-    desc: 'Print, digital, vidéo, native ads, dossiers spéciaux et publi-reportages.',
+    desc: 'Print, digital, vidéo, native ads, dossiers spéciaux.',
   },
   {
-    icon: 'trending-up' as const,
     title: 'Accompagnement',
-    desc: 'Conseil éditorial, production créative et mesure d\'impact de vos campagnes.',
+    desc: 'Conseil éditorial, production créative et mesure d\'impact.',
   },
 ];
 
-const SOLUTIONS = [
-  { icon: 'monitor' as const,       label: 'Display & bannières',        desc: 'Formats web & mobile haute visibilité' },
-  { icon: 'file-text' as const,     label: 'Native & brand content',     desc: 'Articles sponsorisés et dossiers spéciaux' },
-  { icon: 'book-open' as const,     label: 'Magazine print & digital',   desc: 'Encarts, couvertures et publi-rédactionnels' },
-  { icon: 'video' as const,         label: 'Vidéo & podcasts',           desc: 'Contenu audiovisuel sur nos plateformes' },
-  { icon: 'mail' as const,          label: 'Newsletter sponsorisée',     desc: 'Insertion dans notre newsletter santé' },
-  { icon: 'briefcase' as const,     label: 'Offres d\'emploi premium',   desc: 'Diffusion sur l\'espace emploi santé' },
+const PARTNERS = [
+  'Ministère Santé CI',
+  'MEPS',
+  'AIRP',
+  'ONP-CI',
+  'Ordre Med. CI',
+  'PNSM',
+  'CNPTIR',
+  'IMENA',
+  'CNRAO',
+  'CNTS-CI',
+  'UNPPCI',
+  'Labo Montagnier',
+  'CAMU',
+  'oumed',
+  'UFR SPB',
+  'ONCDCI',
+  'ONE-CI',
+  'PSPCI',
+  'CNAM',
+  'INSP',
+  'Laboratoires A',
 ];
 
 const makeStyles = (C: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: C.background },
-  hero: { paddingHorizontal: Spacing['4'], paddingBottom: Spacing['6'] },
+
+  // Hero
+  heroGradient: { paddingHorizontal: Spacing['5'], paddingBottom: Spacing['6'] },
   backBtn: {
     width: 36, height: 36, borderRadius: Radius.full,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
     marginBottom: Spacing['4'],
   },
-  heroTag: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing['3'],
-    paddingVertical: 4,
-    marginBottom: Spacing['3'],
-  },
-  heroTagText: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.xs, color: '#fff' },
   heroTitle: {
     fontFamily: FontFamily.headingBold,
-    fontSize: 24, color: '#fff',
-    lineHeight: 32, marginBottom: Spacing['2'],
+    fontSize: 26,
+    color: '#FFFFFF',
+    lineHeight: 34,
+    marginBottom: Spacing['2'],
   },
   heroSub: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: 'rgba(255,255,255,0.85)',
-    lineHeight: 22, marginBottom: Spacing['5'],
+    color: 'rgba(255,255,255,0.88)',
+    lineHeight: 22,
+    marginBottom: Spacing['5'],
   },
-  heroActions: { flexDirection: 'row', gap: Spacing['3'], flexWrap: 'wrap' },
   whatsappBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing['2'],
-    backgroundColor: '#25D366',
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'],
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing['2'],
+    backgroundColor: WHATSAPP_GREEN,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing['4'],
+    paddingVertical: 11,
   },
-  whatsappBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: '#fff' },
-  kitBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing['2'],
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'],
-  },
-  kitBtnText: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.base, color: '#fff' },
+  whatsappBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: '#FFFFFF' },
 
-  section: { paddingHorizontal: Spacing['4'], paddingTop: Spacing['5'] },
-  sectionTitle: {
-    fontFamily: FontFamily.headingBold, fontSize: FontSize.lg,
-    color: C.textPrimary, marginBottom: Spacing['1'],
-  },
-  sectionSub: {
-    fontFamily: FontFamily.body, fontSize: FontSize.sm,
-    color: C.textMuted, marginBottom: Spacing['4'],
-  },
-
+  // Value cards
+  valueSection: { paddingHorizontal: Spacing['4'], paddingTop: Spacing['5'], gap: Spacing['3'] },
   valueCard: {
     backgroundColor: C.backgroundCard,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: C.borderLight,
     padding: Spacing['4'],
-    marginBottom: Spacing['3'],
-    borderWidth: 1, borderColor: C.borderLight,
-    flexDirection: 'row', alignItems: 'flex-start', gap: Spacing['3'],
+    ...Shadows.card,
   },
-  valueIcon: {
-    width: 44, height: 44, borderRadius: Radius.md,
-    backgroundColor: C.primaryUltraLight,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  valueText: { flex: 1 },
   valueTitle: {
-    fontFamily: FontFamily.headingBold, fontSize: FontSize.base,
-    color: C.textPrimary, marginBottom: 4,
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.sm,
+    color: C.textPrimary,
+    marginBottom: 4,
   },
   valueDesc: {
-    fontFamily: FontFamily.body, fontSize: FontSize.sm,
-    color: C.textSecondary, lineHeight: 20,
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: C.textSecondary,
+    lineHeight: 20,
   },
 
-  solutionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing['3'] },
-  solutionCard: {
-    width: '47%',
+  // Documents section
+  docsSection: { paddingHorizontal: Spacing['4'], paddingTop: Spacing['5'] },
+  sectionTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.base,
+    color: C.textPrimary,
+    marginBottom: Spacing['3'],
+  },
+  pdfCard: {
+    width: 180,
     backgroundColor: C.backgroundCard,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: C.borderLight,
+    overflow: 'hidden',
+    ...Shadows.card,
+  },
+  pdfPreview: {
+    height: 120,
+    backgroundColor: '#EEF4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pdfBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#374151',
+    borderRadius: Radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  pdfBadgeText: { fontFamily: FontFamily.bodyBold, fontSize: 9, color: '#FFFFFF' },
+  pdfLogoText: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: 12,
+    color: '#1B9DD9',
+    textAlign: 'center',
+  },
+  pdfLogoSub: {
+    fontFamily: FontFamily.body,
+    fontSize: 9,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    marginTop: 2,
+  },
+  pdfTitle: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: FontSize.xs,
+    color: '#1B9DD9',
+    padding: Spacing['2'],
+  },
+
+  // Partners section
+  partnersSection: { paddingHorizontal: Spacing['4'], paddingTop: Spacing['5'] },
+  partnersGrid: {
+    borderWidth: 1,
+    borderColor: C.borderLight,
     borderRadius: Radius.lg,
     padding: Spacing['3'],
-    borderWidth: 1, borderColor: C.borderLight,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing['2'],
+    backgroundColor: C.backgroundCard,
   },
-  solutionIcon: {
-    width: 38, height: 38, borderRadius: Radius.sm,
-    backgroundColor: C.primaryUltraLight,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: Spacing['2'],
+  partnerChip: {
+    backgroundColor: C.background,
+    borderWidth: 1,
+    borderColor: C.borderLight,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing['2'],
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 60,
   },
-  solutionLabel: {
-    fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm,
-    color: C.textPrimary, marginBottom: 2,
-  },
-  solutionDesc: {
-    fontFamily: FontFamily.body, fontSize: FontSize.xs,
-    color: C.textMuted, lineHeight: 16,
+  partnerName: {
+    fontFamily: FontFamily.body,
+    fontSize: 9,
+    color: C.textSecondary,
+    textAlign: 'center',
   },
 
-  ctaBanner: {
-    marginHorizontal: Spacing['4'],
+  // Bottom CTA bar
+  ctaBar: {
     marginTop: Spacing['5'],
-    borderRadius: Radius.xl,
-    overflow: 'hidden',
+    marginHorizontal: Spacing['4'],
+    marginBottom: Spacing['4'],
+    backgroundColor: '#1C1C1E',
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing['4'],
+    paddingVertical: Spacing['3'],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing['2'],
   },
-  ctaGrad: { padding: Spacing['5'], alignItems: 'center' },
-  ctaTitle: {
-    fontFamily: FontFamily.headingBold, fontSize: FontSize.lg,
-    color: '#fff', textAlign: 'center', marginBottom: Spacing['2'],
+  ctaLeft: { flex: 1 },
+  ctaLabel: {
+    fontFamily: FontFamily.body,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: 2,
   },
-  ctaSub: {
-    fontFamily: FontFamily.body, fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.85)', textAlign: 'center',
-    lineHeight: 20, marginBottom: Spacing['4'],
+  ctaText: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: 16,
   },
   ctaBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing['2'],
-    backgroundColor: '#fff',
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing['5'], paddingVertical: Spacing['3'],
-  },
-  ctaBtnText: {
-    fontFamily: FontFamily.bodyBold, fontSize: FontSize.base,
-    color: '#1B9DD9',
-  },
-
-  statsRow: {
     flexDirection: 'row',
-    marginHorizontal: Spacing['4'],
-    marginTop: Spacing['5'],
-    gap: Spacing['3'],
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: WHATSAPP_GREEN,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing['4'],
+    paddingVertical: 12,
   },
-  statCard: {
-    flex: 1, backgroundColor: C.backgroundCard,
-    borderRadius: Radius.lg, padding: Spacing['4'],
-    alignItems: 'center', borderWidth: 1, borderColor: C.borderLight,
-  },
-  statNum: {
-    fontFamily: FontFamily.headingBold, fontSize: 22,
-    color: C.primary, marginBottom: 2,
-  },
-  statLabel: {
-    fontFamily: FontFamily.body, fontSize: FontSize.xs,
-    color: C.textMuted, textAlign: 'center',
-  },
-
-  footer: { paddingVertical: Spacing['6'] },
+  ctaBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.sm, color: '#FFFFFF' },
 });
 
-interface Props { onBack?: () => void; onJobsPress?: () => void; }
+interface Props { onBack?: () => void; onJobsPress?: () => void; onKitMediaPress?: () => void; }
 
-export const PartnersScreen: React.FC<Props> = ({ onBack, onJobsPress }) => {
-  const { colors, isDark } = useTheme();
+export const PartnersScreen: React.FC<Props> = ({ onBack }) => {
+  const { colors } = useTheme();
   const styles = makeStyles(colors);
   const insets = useSafeAreaInsets();
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const openKitMedia = async () => {
+    if (pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      const asset = Asset.fromModule(KIT_PDF);
+      await asset.downloadAsync();
+      const uri = asset.localUri!;
+
+      if (Platform.OS === 'android') {
+        try {
+          // expo-file-system v19 stubs legacy methods in the main export;
+          // the legacy subpath still has the real getContentUriAsync backed by native.
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const legacyFS = require('expo-file-system/src/legacy') as {
+            getContentUriAsync: (u: string) => Promise<string>;
+          };
+          const contentUri = await legacyFS.getContentUriAsync(uri);
+          await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+            data: contentUri,
+            flags: 1,
+            type: 'application/pdf',
+          });
+          return;
+        } catch (intentErr) {
+          console.warn('Intent launcher failed, fallback to sharing', intentErr);
+        }
+      }
+
+      // iOS — or Android fallback
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          UTI: 'com.adobe.pdf',
+          dialogTitle: 'Ouvrir le Kit Média',
+        });
+      }
+    } catch (e) {
+      console.warn('PDF open error', e);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1B9DD9" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <StatusBar barStyle="light-content" backgroundColor="#1C1C1E" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom }}>
 
         {/* ── Hero ── */}
         <LinearGradient
-          colors={['#1B9DD9', '#0D6B9A']}
-          style={[styles.hero, { paddingTop: insets.top + Spacing['4'] }]}
+          colors={['#2C3E50', '#1C1C1E']}
+          style={[styles.heroGradient, { paddingTop: insets.top + Spacing['4'] }]}
         >
           <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.8}>
             <Feather name="arrow-left" size={18} color="#fff" />
           </TouchableOpacity>
 
-          <View style={styles.heroTag}>
-            <Text style={styles.heroTagText}>B2B · Partenariats médias</Text>
-          </View>
-
-          <Text style={styles.heroTitle}>Espace{'\n'}Partenaires</Text>
+          <Text style={styles.heroTitle}>Espace partenaires</Text>
           <Text style={styles.heroSub}>
             Des audiences qualifiées, des formats premium, un média de confiance.
           </Text>
 
-          <View style={styles.heroActions}>
-            <TouchableOpacity
-              style={styles.whatsappBtn}
-              onPress={() => Linking.openURL(WHATSAPP_URL)}
-              activeOpacity={0.85}
-            >
-              <Feather name="message-circle" size={18} color="#fff" />
-              <Text style={styles.whatsappBtnText}>Discuter sur WhatsApp</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.kitBtn}
-              onPress={() => Linking.openURL(KIT_MEDIA_URL)}
-              activeOpacity={0.85}
-            >
-              <Feather name="download" size={16} color="#fff" />
-              <Text style={styles.kitBtnText}>Kit Média 2025–2026</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.whatsappBtn}
+            onPress={() => Linking.openURL(WHATSAPP_URL)}
+            activeOpacity={0.85}
+          >
+            <Feather name="message-circle" size={16} color="#fff" />
+            <Text style={styles.whatsappBtnText}>Discuter sur WhatsApp</Text>
+          </TouchableOpacity>
         </LinearGradient>
 
-        {/* ── Stats ── */}
-        <View style={styles.statsRow}>
-          {[
-            { num: '50K+', label: 'Lecteurs actifs' },
-            { num: '12', label: 'Pays africains' },
-            { num: '8 ans', label: "d'expertise santé" },
-          ].map((s) => (
-            <View key={s.num} style={styles.statCard}>
-              <Text style={styles.statNum}>{s.num}</Text>
-              <Text style={styles.statLabel}>{s.label}</Text>
+        {/* ── 3 value cards ── */}
+        <View style={styles.valueSection}>
+          {VALUE_CARDS.map((card) => (
+            <View key={card.title} style={styles.valueCard}>
+              <Text style={styles.valueTitle}>{card.title}</Text>
+              <Text style={styles.valueDesc}>{card.desc}</Text>
             </View>
           ))}
         </View>
 
-        {/* ── Pourquoi nous ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pourquoi Santé Afrique ?</Text>
-          <Text style={styles.sectionSub}>
-            Le média de référence des professionnels de santé en Afrique francophone.
-          </Text>
-          {VALUE_PROPS.map((v) => (
-            <View key={v.title} style={styles.valueCard}>
-              <View style={styles.valueIcon}>
-                <Feather name={v.icon} size={20} color={colors.primary} />
+        {/* ── Documents à télécharger ── */}
+        <View style={styles.docsSection}>
+          <Text style={styles.sectionTitle}>Documents à télécharger</Text>
+          <TouchableOpacity
+            style={styles.pdfCard}
+            onPress={openKitMedia}
+            activeOpacity={0.85}
+            disabled={pdfLoading}
+          >
+            <View style={styles.pdfPreview}>
+              <View style={styles.pdfBadge}>
+                <Text style={styles.pdfBadgeText}>PDF</Text>
               </View>
-              <View style={styles.valueText}>
-                <Text style={styles.valueTitle}>{v.title}</Text>
-                <Text style={styles.valueDesc}>{v.desc}</Text>
-              </View>
+              <Text style={styles.pdfLogoText}>santé afrique</Text>
+              <Text style={styles.pdfLogoSub}>Kit Media{'\n'}2024-2025</Text>
             </View>
-          ))}
+            {pdfLoading
+              ? <ActivityIndicator size="small" color="#1B9DD9" style={{ padding: Spacing['2'] }} />
+              : <Text style={styles.pdfTitle}>KIT MEDIA 2025_2026</Text>
+            }
+          </TouchableOpacity>
         </View>
 
-        {/* ── Nos solutions ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Nos solutions</Text>
-          <Text style={styles.sectionSub}>
-            Des formats adaptés à chaque objectif de communication.
-          </Text>
-          <View style={styles.solutionsGrid}>
-            {SOLUTIONS.map((s) => (
-              <View key={s.label} style={styles.solutionCard}>
-                <View style={styles.solutionIcon}>
-                  <Feather name={s.icon} size={18} color={colors.primary} />
-                </View>
-                <Text style={styles.solutionLabel}>{s.label}</Text>
-                <Text style={styles.solutionDesc}>{s.desc}</Text>
+        {/* ── Ils nous font confiance ── */}
+        <View style={styles.partnersSection}>
+          <Text style={styles.sectionTitle}>Ils nous font confiance</Text>
+          <View style={styles.partnersGrid}>
+            {PARTNERS.map((name) => (
+              <View key={name} style={styles.partnerChip}>
+                <Text style={styles.partnerName}>{name}</Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* ── CTA ── */}
-        <View style={styles.ctaBanner}>
-          <LinearGradient colors={['#0D6B9A', '#1B9DD9']} style={styles.ctaGrad}>
-            <Text style={styles.ctaTitle}>Prêt à toucher les acteurs{'\n'}de la santé en Afrique ?</Text>
-            <Text style={styles.ctaSub}>
-              Contactez notre équipe commerciale pour un devis personnalisé.
-            </Text>
-            <TouchableOpacity
-              style={styles.ctaBtn}
-              onPress={() => Linking.openURL(WHATSAPP_URL)}
-              activeOpacity={0.85}
-            >
-              <Feather name="message-circle" size={18} color="#1B9DD9" />
-              <Text style={styles.ctaBtnText}>Parler sur WhatsApp</Text>
-            </TouchableOpacity>
-          </LinearGradient>
-        </View>
-
-        {/* ── Emplois ── */}
-        <View style={[styles.section, { marginBottom: Spacing['2'] }]}>
+        {/* ── Bottom CTA bar ── */}
+        <View style={styles.ctaBar}>
+          <View style={styles.ctaLeft}>
+            <Text style={styles.ctaLabel}>Prêt à nous rejoindre ?</Text>
+            <Text style={styles.ctaText}>Nous co-construisons un plan média rentable et mesurable.</Text>
+          </View>
           <TouchableOpacity
-            style={[styles.valueCard, { backgroundColor: colors.primaryUltraLight, borderColor: colors.primaryLight }]}
-            onPress={onJobsPress}
-            activeOpacity={0.8}
+            style={styles.ctaBtn}
+            onPress={() => Linking.openURL(WHATSAPP_URL)}
+            activeOpacity={0.85}
           >
-            <View style={[styles.valueIcon, { backgroundColor: colors.primary }]}>
-              <Feather name="briefcase" size={20} color="#fff" />
-            </View>
-            <View style={styles.valueText}>
-              <Text style={[styles.valueTitle, { color: colors.primaryDark }]}>Poster une offre d'emploi</Text>
-              <Text style={styles.valueDesc}>Diffusez vos recrutements auprès des professionnels de santé.</Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={colors.primary} />
+            <Feather name="message-circle" size={14} color="#fff" />
+            <Text style={styles.ctaBtnText}>Parler sur WhatsApp</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.footer} />
       </ScrollView>
     </View>
   );

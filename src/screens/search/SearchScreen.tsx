@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,19 @@ import { Feather } from '@expo/vector-icons';
 import { FontFamily, FontSize, Spacing, Radius } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
+import { fetchArticles, formatDate, getImageUrl } from '@/services/api';
+import type { ApiArticle } from '@/services/api';
+
+function mapArticle(a: ApiArticle): Article {
+  return {
+    id: String(a.id),
+    title: a.title,
+    excerpt: a.excerpt,
+    category: a.category?.slug ?? a.category_name?.toLowerCase().replace(/\s+/g, '_') ?? 'actualites',
+    date: formatDate(a.published_at),
+    imageUrl: getImageUrl(a) ?? undefined,
+  };
+}
 
 // ─── Données mock pour la recherche ──────────────────────────────
 
@@ -177,9 +190,16 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
 
   const [query, setQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>(RECENT_SEARCHES_INITIAL);
+  const [allArticles, setAllArticles] = useState<Article[]>(ALL_ARTICLES);
+
+  useEffect(() => {
+    fetchArticles(1).then((res) => {
+      if (res?.data?.length) setAllArticles(res.data.map(mapArticle));
+    });
+  }, []);
   const inputRef = useRef<TextInput>(null);
 
-  const results = useMemo(() => searchArticles(query, ALL_ARTICLES), [query]);
+  const results = useMemo(() => searchArticles(query, allArticles), [query, allArticles]);
 
   const handleSubmit = useCallback(() => {
     const q = query.trim();

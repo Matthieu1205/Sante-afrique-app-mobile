@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
   FlatList,
+  Image,
   TouchableOpacity,
   StyleSheet,
   StatusBar,
@@ -11,7 +12,10 @@ import {
   ListRenderItem,
   Modal,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
+import { fetchJobs, formatDate } from '@/services/api';
+import type { ApiJob } from '@/services/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -29,6 +33,7 @@ interface Job {
   title: string;
   subtitle: string;
   company: string;
+  logoUrl?: string;
   location: string;
   contractType: string;
   profession: string;
@@ -83,6 +88,24 @@ const JOBS: Job[] = [
     applyUrl: 'https://santeafrique.net/offres-emploi/1/postuler',
   },
 ];
+
+function mapJob(a: ApiJob): Job {
+  return {
+    id: String(a.id),
+    title: a.title,
+    subtitle: a.type,
+    company: a.company,
+    logoUrl: a.logo_url ?? undefined,
+    location: a.country ? `${a.location}, ${a.country}` : a.location,
+    contractType: a.type,
+    profession: a.profession,
+    experience: `${a.experienceMin}+`,
+    date: formatDate(a.publishedAt),
+    description: a.excerpt,
+    detailUrl: `https://santeafrique.net/offres-emploi/${a.id}`,
+    applyUrl: `https://santeafrique.net/offres-emploi/${a.id}/postuler`,
+  };
+}
 
 const CONTRACT_COLORS: Record<string, string> = {
   Stage:     '#2563EB',
@@ -524,8 +547,12 @@ const JobCard: React.FC<{
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
-        <View style={styles.companyAvatar}>
-          <Feather name="briefcase" size={22} color={colors.primary} />
+        <View style={[styles.companyAvatar, job.logoUrl ? { overflow: 'hidden', backgroundColor: 'white' } : null]}>
+          {job.logoUrl ? (
+            <Image source={{ uri: job.logoUrl }} style={{ width: 46, height: 46 }} resizeMode="contain" />
+          ) : (
+            <Feather name="briefcase" size={22} color={colors.primary} />
+          )}
         </View>
         <View style={styles.cardInfo}>
           <Text style={styles.cardTitle} numberOfLines={2}>{job.title}</Text>
@@ -589,6 +616,8 @@ export const JobsScreen: React.FC<JobsScreenProps> = () => {
   const styles = makeStyles(colors);
   const insets = useSafeAreaInsets();
 
+  const [jobs, setJobs] = useState<Job[]>(JOBS);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [activeContract, setActiveContract] = useState(CONTRACT_TYPES[0]);
   const [pays, setPays] = useState(PAYS_OPTIONS[0]);
@@ -600,8 +629,19 @@ export const JobsScreen: React.FC<JobsScreenProps> = () => {
   const [showSubmitCV, setShowSubmitCV] = useState(false);
   const [showBrowseCVs, setShowBrowseCVs] = useState(false);
 
+  useEffect(() => {
+    let mounted = true;
+    fetchJobs().then((res) => {
+      if (!mounted) return;
+      const all = [...(res?.pinned ?? []), ...(res?.items ?? [])];
+      if (all.length > 0) setJobs(all.map(mapJob));
+      setLoading(false);
+    });
+    return () => { mounted = false; };
+  }, []);
+
   const filtered = useMemo(() => {
-    let list = JOBS.filter((job) => {
+    let list = jobs.filter((job) => {
       const matchContract = activeContract === 'Tous' || job.contractType === activeContract;
       const matchPays = pays === 'Tous' || job.location.includes(pays);
       const matchProf = profession === 'Toutes' || job.profession.toLowerCase().includes(profession.toLowerCase());
@@ -618,7 +658,7 @@ export const JobsScreen: React.FC<JobsScreenProps> = () => {
     if (tri === 'Plus anciennes') list = [...list].reverse();
     if (tri === 'A–Z') list = [...list].sort((a, b) => a.title.localeCompare(b.title));
     return list;
-  }, [query, activeContract, pays, profession, entreprise, expMin, tri]);
+  }, [jobs, query, activeContract, pays, profession, entreprise, expMin, tri]);
 
   const renderJob: ListRenderItem<Job> = ({ item }) => (
     <JobCard job={item} styles={styles} colors={colors} />
@@ -670,7 +710,10 @@ export const JobsScreen: React.FC<JobsScreenProps> = () => {
             <Text style={styles.filtersMainTitle}>Toutes les offres d'emploi</Text>
             <Text style={styles.filtersSub}>Secteur santé en Afrique</Text>
           </View>
-          <Text style={styles.filtersCountText}>{JOBS.length} en ligne</Text>
+          {loading
+            ? <ActivityIndicator size="small" color={colors.primary} />
+            : <Text style={styles.filtersCountText}>{jobs.length} en ligne</Text>
+          }
         </View>
 
         <View style={styles.searchRow}>

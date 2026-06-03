@@ -1,4 +1,6 @@
-import React, { useRef, useState } from 'react';
+import { Colors, FontFamily, FontSize, Spacing } from "@/theme";
+import { Feather } from "@expo/vector-icons";
+import React, { useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -9,12 +11,10 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, FontFamily, FontSize, Spacing } from '@/theme';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { width: W, height: H } = Dimensions.get('window');
+const { width: W, height: H } = Dimensions.get("window");
 const IMAGE_H = Math.round(H * 0.62);
 const N = 3;
 
@@ -22,24 +22,24 @@ const N = 3;
 
 const SLIDES = [
   {
-    id: '1',
-    title: 'Santé Afrique',
-    subtitle: 'Infos fiables. Experts africains. Toujours avec vous.',
-    image: require('../../assets/images/doctor.png'),
+    id: "1",
+    title: "Santé Afrique",
+    subtitle: "Infos fiables. Experts africains. Toujours avec vous.",
+    image: require("../../assets/images/doctor.png"),
     image2: null as null,
   },
   {
-    id: '2',
-    title: 'Accès illimité',
-    subtitle: 'Créez votre compte. Abonnez-vous. Profitez sans limite.',
-    image: require('../../assets/images/sagef.png'),
-    image2: require('../../assets/images/sagefemme.png'),
+    id: "2",
+    title: "Accès illimité",
+    subtitle: "Créez votre compte. Abonnez-vous. Profitez sans limite.",
+    image: require("../../assets/images/sagef.png"),
+    image2: require("../../assets/images/sagefemme.png"),
   },
   {
-    id: '3',
-    title: 'Carrière santé',
-    subtitle: 'Publiez vos offres. Mettez votre CV. Trouvez des opportunités.',
-    image: require('../../assets/images/medecin.jpg'),
+    id: "3",
+    title: "Carrière santé",
+    subtitle: "Publiez vos offres. Mettez votre CV. Trouvez des opportunités.",
+    image: require("../../assets/images/medecin.jpg"),
     image2: null as null,
   },
 ];
@@ -54,7 +54,9 @@ interface OnboardingScreenProps {
   onComplete: () => void;
 }
 
-export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
+export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
+  onComplete,
+}) => {
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(0);
 
@@ -85,7 +87,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
         if (gs.vx < -0.3 || gs.dx < -50) goTo(Math.min(cur + 1, N - 1));
         else if (gs.vx > 0.3 || gs.dx > 50) goTo(Math.max(cur - 1, 0));
       },
-    })
+    }),
   ).current;
 
   const handleNext = () => {
@@ -95,15 +97,24 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
 
       {/* ── Images strip ─────────────────────────────── */}
       <View style={styles.imageContainer} {...pan.panHandlers}>
-        <Animated.View style={[styles.imageStrip, { transform: [{ translateX: tx }] }]}>
-
+        <Animated.View
+          style={[styles.imageStrip, { transform: [{ translateX: tx }] }]}
+        >
           {/* Slide 1 — image pleine largeur */}
           <View style={styles.imageSlot}>
-            <Image source={SLIDES[0].image} style={styles.image} resizeMode="cover" />
+            <Image
+              source={SLIDES[0].image}
+              style={styles.image}
+              resizeMode="cover"
+            />
             <SlideOverlay index={0} tx={tx} />
           </View>
 
@@ -111,12 +122,18 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
           <View style={[styles.imageSlot, styles.dualBg]}>
             <Image
               source={SLIDES[1].image}
-              style={[styles.phoneLeft, { width: PHONE_W, height: PHONE_W * 2.10 }]}
+              style={[
+                styles.phoneLeft,
+                { width: PHONE_W, height: PHONE_W * 2.1 },
+              ]}
               resizeMode="contain"
             />
             <Image
               source={SLIDES[1].image2!}
-              style={[styles.phoneRight, { width: PHONE_W, height: PHONE_W * 2.10 }]}
+              style={[
+                styles.phoneRight,
+                { width: PHONE_W, height: PHONE_W * 2.1 },
+              ]}
               resizeMode="contain"
             />
             <SlideOverlay index={1} tx={tx} />
@@ -124,34 +141,44 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
 
           {/* Slide 3 — image pleine largeur */}
           <View style={styles.imageSlot}>
-            <Image source={SLIDES[2].image} style={styles.image} resizeMode="cover" />
+            <Image
+              source={SLIDES[2].image}
+              style={styles.image}
+              resizeMode="cover"
+            />
             <SlideOverlay index={2} tx={tx} />
           </View>
-
         </Animated.View>
       </View>
 
       {/* ── White panel ──────────────────────────────── */}
-      <View style={[styles.panel, { paddingBottom: Math.max(insets.bottom + 8, 28) }]}>
-
+      <View
+        style={[
+          styles.panel,
+          { paddingBottom: Math.max(insets.bottom + 8, 28) },
+        ]}
+      >
         {/* Text animé par slide */}
         <View style={styles.textArea}>
           {SLIDES.map((slide, i) => {
             const opacity = tx.interpolate({
               inputRange: [-(i + 1) * W, -i * W, -(i - 1) * W],
               outputRange: [0, 1, 0],
-              extrapolate: 'clamp',
+              extrapolate: "clamp",
             });
             const ty = tx.interpolate({
               inputRange: [-(i + 1) * W, -i * W, -(i - 1) * W],
               outputRange: [18, 0, -18],
-              extrapolate: 'clamp',
+              extrapolate: "clamp",
             });
             return (
               <Animated.View
                 key={slide.id}
-                style={[styles.slideText, { opacity, transform: [{ translateY: ty }] }]}
-                pointerEvents={i === index ? 'auto' : 'none'}
+                style={[
+                  styles.slideText,
+                  { opacity, transform: [{ translateY: ty }] },
+                ]}
+                pointerEvents={i === index ? "auto" : "none"}
               >
                 <Text style={styles.title}>{slide.title}</Text>
                 <Text style={styles.subtitle}>{slide.subtitle}</Text>
@@ -166,12 +193,12 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
             const dotW = tx.interpolate({
               inputRange: [-(i + 1) * W, -i * W, -(i - 1) * W],
               outputRange: [8, 28, 8],
-              extrapolate: 'clamp',
+              extrapolate: "clamp",
             });
             const dotOpacity = tx.interpolate({
               inputRange: [-(i + 1) * W, -i * W, -(i - 1) * W],
               outputRange: [0.3, 1, 0.3],
-              extrapolate: 'clamp',
+              extrapolate: "clamp",
             });
             return (
               <Animated.View
@@ -191,9 +218,13 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
             <Text style={styles.skip}>PASSER</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={styles.nextBtn}
+            onPress={handleNext}
+            activeOpacity={0.85}
+          >
             <Feather
-              name={isLast ? 'check' : 'arrow-right'}
+              name={isLast ? "check" : "arrow-right"}
               size={26}
               color={Colors.white}
             />
@@ -206,13 +237,20 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
 
 // ─── Overlay de transition entre slides ──────────────────────────
 
-const SlideOverlay: React.FC<{ index: number; tx: Animated.Value }> = ({ index: i, tx }) => {
+const SlideOverlay: React.FC<{ index: number; tx: Animated.Value }> = ({
+  index: i,
+  tx,
+}) => {
   const opacity = tx.interpolate({
     inputRange: [-(i + 1) * W, -i * W, -(i - 1) * W],
     outputRange: [0.35, 0, 0.35],
-    extrapolate: 'clamp',
+    extrapolate: "clamp",
   });
-  return <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity }]} />;
+  return (
+    <Animated.View
+      style={[StyleSheet.absoluteFill, { backgroundColor: "#000", opacity }]}
+    />
+  );
 };
 
 // ─── Styles ───────────────────────────────────────────────────────
@@ -222,9 +260,9 @@ const PANEL_H = H - IMAGE_H;
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.white },
 
-  imageContainer: { height: IMAGE_H, overflow: 'hidden' },
+  imageContainer: { height: IMAGE_H, overflow: "hidden" },
   imageStrip: {
-    flexDirection: 'row',
+    flexDirection: "row",
     width: W * N,
     height: IMAGE_H,
   },
@@ -233,20 +271,20 @@ const styles = StyleSheet.create({
 
   // Slide 2 — fond clair + téléphones en absolu
   dualBg: {
-    backgroundColor: '#E4F3FC',
+    backgroundColor: "#E4F3FC",
   },
   phoneLeft: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     bottom: 20,
-    transform: [{ rotate: '-6deg' }],
+    transform: [{ rotate: "-6deg" }],
     zIndex: 1,
   },
   phoneRight: {
-    position: 'absolute',
+    position: "absolute",
     right: W * 0.04,
     bottom: 4,
-    transform: [{ rotate: '4deg' }],
+    transform: [{ rotate: "4deg" }],
     zIndex: 2,
   },
 
@@ -254,22 +292,24 @@ const styles = StyleSheet.create({
   panel: {
     height: PANEL_H,
     backgroundColor: Colors.white,
-    paddingHorizontal: Spacing['5'],
-    paddingTop: Spacing['5'],
-    gap: Spacing['4'],
+    paddingHorizontal: Spacing["5"],
+    paddingTop: Spacing["5"],
+    gap: Spacing["4"],
   },
-  textArea: { flex: 1, position: 'relative', minHeight: 80 },
+  textArea: { flex: 1, position: "relative", minHeight: 80 },
   slideText: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    gap: Spacing['2'],
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    gap: Spacing["2"],
   },
   title: {
     fontFamily: FontFamily.headingBold,
-    fontSize: FontSize['3xl'],
+    fontSize: FontSize["3xl"],
     color: Colors.primary,
     letterSpacing: -0.5,
-    lineHeight: FontSize['3xl'] * 1.15,
+    lineHeight: FontSize["3xl"] * 1.15,
   },
   subtitle: {
     fontFamily: FontFamily.body,
@@ -279,11 +319,15 @@ const styles = StyleSheet.create({
   },
 
   // Dots
-  dots: { flexDirection: 'row', alignItems: 'center', gap: Spacing['2'] },
+  dots: { flexDirection: "row", alignItems: "center", gap: Spacing["2"] },
   dot: { height: 8, borderRadius: 4, backgroundColor: Colors.primary },
 
   // Navigation
-  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  nav: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   skip: {
     fontFamily: FontFamily.bodySemiBold,
     fontSize: FontSize.sm,
@@ -291,12 +335,16 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   nextBtn: {
-    width: 60, height: 60, borderRadius: 30,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: Colors.primary,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45, shadowRadius: 10,
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
     elevation: 10,
   },
 });

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +14,9 @@ import { Feather } from '@expo/vector-icons';
 import { FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
+
+const TOPICS_KEY = 'settings_topics_v1';
+const DEFAULT_TOPICS = ['actualites', 'dossiers', 'vaccination'];
 
 interface SettingsScreenProps {
   onBack?: () => void;
@@ -145,6 +149,14 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     color: C.textSecondary,
   },
   topicLabelActive: { fontFamily: FontFamily.bodySemiBold, color: C.white },
+  topicsCount: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.xs,
+    color: C.textMuted,
+    paddingHorizontal: Spacing['4'],
+    paddingTop: Spacing['2'],
+    paddingBottom: Spacing['1'],
+  },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -192,18 +204,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const styles = makeStyles(colors);
 
   const [selectedCountry, setSelectedCountry] = useState('ci');
-  const [selectedTopics, setSelectedTopics] = useState(
-    new Set(['actualites', 'dossiers', 'vaccination'])
+  const [selectedTopics, setSelectedTopics] = useState<Set<string>>(
+    new Set(DEFAULT_TOPICS)
   );
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
 
-  const toggleTopic = (id: string) =>
+  useEffect(() => {
+    AsyncStorage.getItem(TOPICS_KEY).then((raw) => {
+      if (raw) setSelectedTopics(new Set(JSON.parse(raw)));
+    });
+  }, []);
+
+  const toggleTopic = (id: string) => {
     setSelectedTopics((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
+      AsyncStorage.setItem(TOPICS_KEY, JSON.stringify([...next]));
       return next;
     });
+  };
 
   const country = COUNTRIES.find((c) => c.code === selectedCountry)!;
 
@@ -286,6 +306,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             );
           })}
         </View>
+        <Text style={styles.topicsCount}>
+          {selectedTopics.size} thème{selectedTopics.size > 1 ? 's' : ''} sélectionné{selectedTopics.size > 1 ? 's' : ''}
+        </Text>
 
         {/* Notifications */}
         <Text style={styles.sectionHeader}>Notifications</Text>

@@ -18,7 +18,7 @@
     "android": {
       "icon": "./src/assets/icon-blue.png",
       "adaptiveIcon": {
-        "foregroundImage": "./src/assets/logo2.png",
+        "foregroundImage": "./src/assets/icon-blue.png",
         "backgroundColor": "#1B9DD9"
       },
       "package": "net.santeafrique.app"
@@ -27,7 +27,16 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./src/assets/logo-SA.png",
+          "color": "#1B9DD9",
+          "defaultChannel": "default"
+        }
+      ],
+      "expo-asset"
     ],
     "extra": {
       "eas": {

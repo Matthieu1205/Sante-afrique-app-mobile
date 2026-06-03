@@ -7,6 +7,7 @@ import {
 } from "@/theme";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { ThemeColors } from "@/contexts/ThemeContext";
+import { Feather } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ArticleType, ArticleTypeBadge } from "./ArticleTypeBadge";
@@ -37,11 +38,14 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
   listCard: {
     flexDirection: "row",
     backgroundColor: C.backgroundCard,
-    paddingHorizontal: Spacing["6"],
-    paddingVertical: Spacing["3"],
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
-    gap: Spacing["4"],
+    paddingHorizontal: Spacing["4"],
+    paddingVertical: Spacing["4"],
+    gap: Spacing["3"],
+  },
+  listCardSeparator: {
+    height: 1,
+    backgroundColor: C.borderLight,
+    marginHorizontal: Spacing["4"],
   },
   listLeft: {
     flex: 1,
@@ -72,7 +76,6 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     marginLeft: "auto",
   },
   actionBtn: { padding: 2 },
-  actionIcon: { fontSize: 16 },
   listImageWrapper: { position: "relative" },
   listImage: { width: 80, height: 80, borderRadius: Radius.sm },
   premiumBadge: {
@@ -153,54 +156,61 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
   }
 
   return (
-    <TouchableOpacity
-      style={styles.listCard}
-      onPress={onPress}
-      activeOpacity={0.85}
-    >
-      <View style={styles.listLeft}>
-        {article.articleType && (
-          <ArticleTypeBadge type={article.articleType} compact />
-        )}
-        <Text style={styles.listTitle} numberOfLines={3}>
-          {article.title}
-        </Text>
-        <View style={styles.listMeta}>
-          <CategoryBadge category={article.category} />
-          <Text style={styles.dateText}>{article.date}</Text>
-          <View style={styles.actions}>
-            {article.hasAudio && (
+    <>
+      <TouchableOpacity
+        style={styles.listCard}
+        onPress={onPress}
+        activeOpacity={0.85}
+      >
+        <View style={styles.listLeft}>
+          {article.articleType && (
+            <ArticleTypeBadge type={article.articleType} compact />
+          )}
+          <Text style={styles.listTitle} numberOfLines={3}>
+            {article.title}
+          </Text>
+          <View style={styles.listMeta}>
+            <CategoryBadge category={article.category} />
+            <Text style={styles.dateText}>{article.date}</Text>
+            <View style={styles.actions}>
+              {article.hasAudio && (
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={onAudioPress}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Feather name="volume-2" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={styles.actionBtn}
-                onPress={onAudioPress}
+                onPress={handleBookmark}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.actionIcon}>🔊</Text>
+                <Feather
+                  name="bookmark"
+                  size={16}
+                  color={bookmarked ? colors.primary : colors.textMuted}
+                />
               </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={handleBookmark}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={styles.actionIcon}>{bookmarked ? "🔖" : "🔖"}</Text>
-            </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.listImageWrapper}>
-        {article.imageUrl ? (
-          <Image source={{ uri: article.imageUrl }} style={styles.listImage} />
-        ) : (
-          <View style={[styles.listImage, styles.imagePlaceholder]} />
-        )}
-        {article.isPremium && (
-          <View style={styles.premiumBadge}>
-            <Text style={styles.premiumText}>A</Text>
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
+        <View style={styles.listImageWrapper}>
+          {article.imageUrl ? (
+            <Image source={{ uri: article.imageUrl }} style={styles.listImage} />
+          ) : (
+            <View style={[styles.listImage, styles.imagePlaceholder]} />
+          )}
+          {article.isPremium && (
+            <View style={styles.premiumBadge}>
+              <Text style={styles.premiumText}>A</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+      <View style={styles.listCardSeparator} />
+    </>
   );
 };

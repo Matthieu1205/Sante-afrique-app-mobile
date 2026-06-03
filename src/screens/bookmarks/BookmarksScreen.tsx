@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   FlatList,
+  Image,
   TouchableOpacity,
   StyleSheet,
   StatusBar,
@@ -12,27 +13,24 @@ import { Feather } from '@expo/vector-icons';
 import { Colors, FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
+import {
+  getBookmarks,
+  removeBookmark,
+  clearBookmarks,
+  type BookmarkedArticle,
+} from '@/services/bookmarks';
 
 interface BookmarksScreenProps {
   onBack?: () => void;
   onArticlePress?: (id: string) => void;
 }
 
-const MOCK_BOOKMARKS = [
-  { id: '1', title: 'Paludisme : les nouvelles thérapies combinées montrent 94% d\'efficacité', category: 'Actualités', date: '24 Avr 2025', readTime: '5 min', type: 'Actualité' },
-  { id: '2', title: 'Santé mentale en Afrique subsaharienne : lever le tabou pour mieux soigner', category: 'Santé Mentale', date: '22 Avr 2025', readTime: '8 min', type: 'Dossier' },
-  { id: '3', title: 'Vaccination : l\'Afrique atteint 70% de couverture vaccinale enfants', category: 'Vaccination', date: '20 Avr 2025', readTime: '4 min', type: 'Actualité' },
-  { id: '4', title: 'Nutrition infantile : cinq gestes simples pour prévenir la malnutrition', category: 'Nutrition Infantile', date: '18 Avr 2025', readTime: '6 min', type: 'Conseil' },
-  { id: '5', title: 'Business Santé : les startups africaines lèvent 2,3 milliards USD en 2024', category: 'Business Santé', date: '15 Avr 2025', readTime: '7 min', type: 'Dossier' },
-];
-
-type Bookmark = typeof MOCK_BOOKMARKS[0];
-
 const typeColors: Record<string, string> = {
   'Actualité': Colors.badgeActualite,
   'Dossier':   Colors.badgeDossier,
   'Conseil':   Colors.badgeConseilPratique,
   'Tribune':   Colors.badgeTribune,
+  'Interview': Colors.badgeActualite,
 };
 
 const makeCardStyles = (C: ThemeColors) => StyleSheet.create({
@@ -45,7 +43,8 @@ const makeCardStyles = (C: ThemeColors) => StyleSheet.create({
     overflow: 'hidden',
     ...Shadows.card,
   },
-  imagePlaceholder: {
+  thumb: { width: 90, height: '100%', backgroundColor: C.background },
+  thumbPlaceholder: {
     width: 90,
     backgroundColor: C.background,
     alignItems: 'center',
@@ -62,7 +61,7 @@ const makeCardStyles = (C: ThemeColors) => StyleSheet.create({
 });
 
 const BookmarkItem: React.FC<{
-  item: Bookmark;
+  item: BookmarkedArticle;
   onPress: () => void;
   onRemove: () => void;
 }> = ({ item, onPress, onRemove }) => {
@@ -70,9 +69,13 @@ const BookmarkItem: React.FC<{
   const card = makeCardStyles(colors);
   return (
     <TouchableOpacity style={card.container} onPress={onPress} activeOpacity={0.8}>
-      <View style={card.imagePlaceholder}>
-        <Feather name="file-text" size={28} color={colors.textDisabled} />
-      </View>
+      {item.imageUrl ? (
+        <Image source={{ uri: item.imageUrl }} style={card.thumb} resizeMode="cover" />
+      ) : (
+        <View style={card.thumbPlaceholder}>
+          <Feather name="file-text" size={28} color={colors.textDisabled} />
+        </View>
+      )}
       <View style={card.content}>
         <View style={card.meta}>
           <View style={[card.badge, { backgroundColor: typeColors[item.type] ?? colors.primary }]}>
@@ -127,9 +130,21 @@ export const BookmarksScreen: React.FC<BookmarksScreenProps> = ({
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const styles = makeStyles(colors);
-  const [items, setItems] = useState(MOCK_BOOKMARKS);
+  const [items, setItems] = useState<BookmarkedArticle[]>([]);
 
-  const remove = (id: string) => setItems((prev) => prev.filter((b) => b.id !== id));
+  useEffect(() => {
+    getBookmarks().then(setItems);
+  }, []);
+
+  const handleRemove = async (id: string) => {
+    await removeBookmark(id);
+    setItems((prev) => prev.filter((b) => b.id !== id));
+  };
+
+  const handleClear = async () => {
+    await clearBookmarks();
+    setItems([]);
+  };
 
   return (
     <View style={styles.container}>
@@ -144,10 +159,12 @@ export const BookmarksScreen: React.FC<BookmarksScreenProps> = ({
           <Feather name="arrow-left" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mes favoris</Text>
-        {items.length > 0 && (
-          <TouchableOpacity onPress={() => setItems([])}>
+        {items.length > 0 ? (
+          <TouchableOpacity onPress={handleClear}>
             <Text style={styles.clearBtn}>Tout effacer</Text>
           </TouchableOpacity>
+        ) : (
+          <View style={{ width: 80 }} />
         )}
       </View>
 
@@ -167,7 +184,7 @@ export const BookmarksScreen: React.FC<BookmarksScreenProps> = ({
             <BookmarkItem
               item={item}
               onPress={() => onArticlePress?.(item.id)}
-              onRemove={() => remove(item.id)}
+              onRemove={() => handleRemove(item.id)}
             />
           )}
           contentContainerStyle={styles.list}
