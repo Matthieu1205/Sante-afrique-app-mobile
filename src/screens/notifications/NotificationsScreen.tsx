@@ -7,8 +7,8 @@ import {
   Switch,
   StyleSheet,
   StatusBar,
-  ActivityIndicator,
 } from 'react-native';
+import { ListSkeleton } from '@/components/common';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
@@ -338,9 +338,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
 
       {tab === 'alerts' ? (
         loading ? (
-          <View style={styles.empty}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
+          <ListSkeleton count={6} />
         ) : (
           <FlatList
             data={items}

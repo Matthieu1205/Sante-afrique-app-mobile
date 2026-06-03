@@ -1,5 +1,5 @@
 import type { Article } from "@/components/common";
-import { ArticleCard, ArticleTypeBadge, CategoryBadge } from "@/components/common";
+import { ArticleCard, ArticleDetailSkeleton, ArticleTypeBadge, CategoryBadge } from "@/components/common";
 import { FontFamily, FontSize, Radius, Spacing } from "@/theme";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { ThemeColors } from "@/contexts/ThemeContext";
@@ -481,11 +481,7 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
   }, [articleId]);
 
   if (loading) {
-    return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <ArticleDetailSkeleton />;
   }
 
   return (

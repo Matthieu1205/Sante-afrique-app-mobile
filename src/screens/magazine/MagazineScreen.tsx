@@ -28,6 +28,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchMagazineIssues } from "@/services/api";
 import type { ApiMagazineIssue } from "@/services/api";
+import { MagazineSkeleton } from "@/components/common";
 
 const COVER_COLORS: [string, string][] = [
   ["#1E3A5F", "#0A2540"],
@@ -515,11 +516,7 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
       </LinearGradient>
 
       {tab === "kiosk" ? (
-        loadingIssues ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-          </View>
-        ) :
+        loadingIssues ? <MagazineSkeleton /> :
         <FlatList
           data={archives}
           keyExtractor={(item) => item.id}

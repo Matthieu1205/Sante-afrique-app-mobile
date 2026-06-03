@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { loginUser } from '@/services/api';
 import {
   View,
   Text,
@@ -160,15 +161,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [loginError, setLoginError] = useState('');
 
   const validateEmail = (value: string) => {
     setEmailError(value.length > 0 && !value.includes('@') ? 'Adresse email invalide' : '');
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email || !password || loading) return;
     setLoading(true);
-    setTimeout(() => { setLoading(false); onLogin(); }, 1200);
+    setLoginError('');
+    const result = await loginUser(email, password);
+    setLoading(false);
+    if (result.ok) {
+      onLogin();
+    } else {
+      setLoginError(result.message);
+    }
   };
 
   const canSubmit = email.length > 0 && password.length > 0 && !emailError;
@@ -255,6 +264,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </TouchableOpacity>
             </View>
           </View>
+
+          {loginError ? (
+            <Text style={[styles.errorText, { textAlign: 'center', marginTop: 4 }]}>
+              {loginError}
+            </Text>
+          ) : null}
 
           <TouchableOpacity
             style={[styles.loginBtn, (!canSubmit || loading) && styles.loginBtnDisabled]}

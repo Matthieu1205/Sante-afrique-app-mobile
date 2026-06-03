@@ -9,9 +9,8 @@ import {
   StatusBar,
   Platform,
   ListRenderItem,
-  ActivityIndicator,
 } from 'react-native';
-import { ArticleCard } from '@/components/common';
+import { ArticleCard, ListSkeleton } from '@/components/common';
 import type { Article } from '@/components/common';
 import { Feather } from '@expo/vector-icons';
 import { FontFamily, FontSize, Spacing, Radius } from '@/theme';
@@ -244,9 +243,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
       {/* Résultats */}
       {query.length > 0 ? (
         searching ? (
-          <View style={styles.emptyState}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
+          <ListSkeleton count={4} />
         ) : results.length > 0 ? (
           <FlatList
             data={results}

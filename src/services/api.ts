@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE = 'https://api.santeafrique.net/api';
+const BASE         = 'https://api.santeafrique.net/api';
+const BASE_STORAGE = 'https://api.santeafrique.net'; // pour /storage/...
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -143,16 +144,15 @@ export interface ApiBanner {
   title: string;
   title_highlight?: string | null;
   subtitle?: string | null;
-  // bouton / CTA
   button_text?: string;
   button_url?: string;
   cta_text?: string;
   cta_url?: string;
-  // couleurs gradient (optionnel si image seule)
+  link_url?: string;
+  position?: number;
   color_start?: string;
   color_end?: string;
   dark_text?: boolean;
-  // image
   image_url?: string | null;
   image?: string | null;
   order?: number;
@@ -160,16 +160,22 @@ export interface ApiBanner {
 }
 
 export async function fetchBanners(): Promise<ApiBanner[] | null> {
-  // Le backend expose /hero-slides (pas /banners)
   const res = await apiFetch<{ data: ApiBanner[] } | { items: ApiBanner[] } | ApiBanner[]>(
     '/hero-slides',
     'hero_slides',
   );
   if (!res) return null;
-  if (Array.isArray(res)) return res;
-  if ('data' in res) return res.data;
-  if ('items' in res) return res.items;
-  return null;
+  let items: ApiBanner[] | null = null;
+  if (Array.isArray(res)) items = res;
+  else if ('data' in res) items = res.data;
+  else if ('items' in res) items = res.items;
+  if (!items) return null;
+  // Les URLs /storage/... sont relatives — on préfixe avec le domaine racine (sans /api)
+  return items.map((b) => ({
+    ...b,
+    image_url: b.image_url?.startsWith('/') ? `${BASE_STORAGE}${b.image_url}` : b.image_url,
+    image:     b.image?.startsWith('/')     ? `${BASE_STORAGE}${b.image}`     : b.image,
+  }));
 }
 
 // ─── Vidéos YouTube ───────────────────────────────────────────────
@@ -227,6 +233,58 @@ const RUBRIQUE_SLUG_MAP: Record<string, string> = {
 export function resolveRubriqueSlug(localSlug: string): string {
   if (localSlug in RUBRIQUE_SLUG_MAP) return RUBRIQUE_SLUG_MAP[localSlug];
   return localSlug.replace(/_/g, '-'); // fallback générique
+}
+
+// ─── Authentification ────────────────────────────────────────────
+
+export interface AuthUser {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface LoginResult {
+  ok: true;
+  token: string;
+  user: AuthUser;
+}
+
+export interface LoginError {
+  ok: false;
+  message: string;
+}
+
+export async function loginUser(
+  email: string,
+  password: string,
+): Promise<LoginResult | LoginError> {
+  try {
+    const res = await fetch(`${BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const json = await res.json() as Record<string, unknown>;
+    console.log('[loginUser] status:', res.status, 'body:', JSON.stringify(json));
+    if (!res.ok) {
+      const msg = (json.message as string) ?? (json.error as string) ?? 'Identifiants incorrects';
+      return { ok: false, message: msg };
+    }
+    const token = (json.token ?? json.access_token) as string;
+    const user  = (json.user ?? json.data) as AuthUser;
+    await AsyncStorage.setItem('auth_token', token);
+    return { ok: true, token, user };
+  } catch {
+    return { ok: false, message: 'Impossible de se connecter au serveur' };
+  }
+}
+
+export async function logoutUser(): Promise<void> {
+  await AsyncStorage.removeItem('auth_token');
+}
+
+export async function getAuthToken(): Promise<string | null> {
+  return AsyncStorage.getItem('auth_token');
 }
 
 // ─── Recherche full-text ──────────────────────────────────────────

@@ -3,6 +3,7 @@ import {
   AppHeader,
   ArticleCard,
   CategoryBadge,
+  HomeScreenSkeleton,
   RatingWidget,
   shouldShowRatingWidget,
   SponsoredCard,
@@ -18,6 +19,7 @@ import {
   formatDate,
   getImageUrl,
 } from "@/services/api";
+import { getPreferredSlugs } from "@/services/preferences";
 import { Colors, FontFamily, FontSize, Radius, Spacing } from "@/theme";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -29,11 +31,11 @@ import React, {
   useState,
 } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Dimensions,
   FlatList,
   Image,
+  Linking,
   ListRenderItem,
   Modal,
   PanResponder,
@@ -762,6 +764,8 @@ interface BannerSlide {
   icon: React.ComponentProps<typeof Feather>["name"];
   colors: [string, string];
   darkText: boolean;
+  imageUrl?: string;
+  linkUrl?: string;
 }
 
 const BANNER_SLIDES: BannerSlide[] = [
@@ -817,17 +821,19 @@ function mapApiBanner(b: ApiBanner): BannerSlide {
   return {
     id:             String(b.id),
     tag:            b.tag ?? "",
-    title:          b.title,
+    title:          b.title === "." ? "" : b.title,
     titleHighlight: b.title_highlight ?? undefined,
     lines:          undefined,
     button:         b.button_text ?? b.cta_text ?? "Lire",
     icon:           "file-text",
     colors:         [b.color_start ?? "#1B9DD9", b.color_end ?? "#0C7EBA"] as [string, string],
     darkText:       b.dark_text ?? false,
+    imageUrl:       b.image_url ?? b.image ?? undefined,
+    linkUrl:        b.link_url ?? b.button_url ?? b.cta_url ?? undefined,
   };
 }
 
-const PromoBannerCard: React.FC = () => {
+const PromoBannerCard: React.FC<{ onNavigate?: (target: 'magazine' | 'jobs') => void }> = ({ onNavigate }) => {
   const listRef = useRef<FlatList>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const indexRef = useRef(0);
@@ -835,6 +841,7 @@ const PromoBannerCard: React.FC = () => {
 
   useEffect(() => {
     fetchBanners().then((data) => {
+      console.log('[PromoBanner] fetchBanners result:', JSON.stringify(data?.slice(0,2)));
       if (data && data.length > 0) setSlides(data.map(mapApiBanner));
     });
   }, []);
@@ -872,171 +879,145 @@ const PromoBannerCard: React.FC = () => {
           setActiveIndex(idx);
         }}
         renderItem={({ item: slide }) => (
-          <LinearGradient
-            colors={slide.colors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{
-              width: BANNER_W,
-              borderRadius: Radius.lg,
-              overflow: "hidden",
-              flexDirection: "row",
-              alignItems: "center",
-              minHeight: 140,
-              paddingVertical: Spacing["4"],
-              paddingLeft: Spacing["5"],
-              paddingRight: Spacing["3"],
-            }}
+          <TouchableOpacity
+            activeOpacity={slide.linkUrl ? 0.9 : 1}
+            onPress={() => slide.linkUrl && Linking.openURL(slide.linkUrl)}
+            style={{ width: BANNER_W }}
           >
-            <View style={{ flex: 1 }}>
-              {/* Tag */}
-              {!!slide.tag && (
-                <Text
-                  style={{
-                    fontFamily: FontFamily.body,
-                    fontSize: FontSize.xs,
-                    color: slide.darkText
-                      ? "#64748B"
-                      : "rgba(255,255,255,0.75)",
-                    marginBottom: 6,
-                  }}
-                >
-                  {slide.tag}
-                </Text>
-              )}
-
-              {/* Titre principal avec highlight optionnel */}
-              <Text
-                style={{
-                  fontFamily: FontFamily.headingBold,
-                  fontSize: slide.id === "n21" ? FontSize["2xl"] : FontSize.xl,
-                  color: slide.darkText ? "#0F172A" : "white",
-                  lineHeight:
-                    (slide.id === "n21" ? FontSize["2xl"] : FontSize.xl) * 1.2,
-                }}
-              >
-                {slide.title}
-                {slide.titleHighlight && (
-                  <Text
+            {slide.imageUrl ? (
+              /* ── Slide image réelle (depuis /api/hero-slides) ── */
+              <View style={{ width: BANNER_W, height: 160, borderRadius: Radius.lg, overflow: "hidden" }}>
+                <Image
+                  source={{ uri: slide.imageUrl }}
+                  style={{ width: BANNER_W, height: 160 }}
+                  resizeMode="cover"
+                />
+                {slide.linkUrl && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      const target = slide.linkUrl!.includes('magazine') ? 'magazine' : 'jobs';
+                      onNavigate?.(target);
+                    }}
+                    activeOpacity={0.85}
                     style={{
-                      color: slide.id === "cv" ? "#1B9DD9" : "#1B9DD9",
-                      backgroundColor:
-                        slide.id === "cv" ? "white" : "transparent",
+                      position: "absolute",
+                      bottom: Spacing["3"],
+                      left: Spacing["4"],
+                      backgroundColor: "white",
+                      borderRadius: Radius.sm,
+                      paddingHorizontal: Spacing["4"],
+                      paddingVertical: Spacing["2"],
                     }}
                   >
-                    {slide.titleHighlight}
-                  </Text>
+                    <Text style={{ fontFamily: FontFamily.headingBold, fontSize: FontSize.sm, color: Colors.primary }}>
+                      {slide.linkUrl.includes('magazine') ? 'Lire' : 'Voir les offres'}
+                    </Text>
+                  </TouchableOpacity>
                 )}
-                {slide.id === "bonneinfo" && (
-                  <Text style={{ color: slide.darkText ? "#0F172A" : "white" }}>
-                    {" "}
-                    info
-                  </Text>
-                )}
-                {slide.id === "cv" && (
-                  <Text style={{ color: "#0F172A" }}>
-                    {" "}
-                    à jours{"\n"}pour les recruteurs
-                  </Text>
-                )}
-              </Text>
-
-              {/* Lignes "les bons…" pour slide 3 */}
-              {slide.lines && (
-                <View style={{ marginTop: 6, gap: 2 }}>
-                  {[
-                    { suffix: "conseils" },
-                    { suffix: "réflexes" },
-                    { suffix: "habitudes" },
-                    { suffix: "gestes" },
-                  ].map((l, i) => (
+              </View>
+            ) : (
+              /* ── Fallback : slide gradient avec texte ── */
+              <LinearGradient
+                colors={slide.colors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{
+                  width: BANNER_W,
+                  borderRadius: Radius.lg,
+                  overflow: "hidden",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  minHeight: 140,
+                  paddingVertical: Spacing["4"],
+                  paddingLeft: Spacing["5"],
+                  paddingRight: Spacing["3"],
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  {!!slide.tag && (
                     <Text
-                      key={i}
                       style={{
-                        fontFamily: FontFamily.bodySemiBold,
-                        fontSize: FontSize.sm,
-                        color: "#334155",
+                        fontFamily: FontFamily.body,
+                        fontSize: FontSize.xs,
+                        color: slide.darkText ? "#64748B" : "rgba(255,255,255,0.75)",
+                        marginBottom: 6,
                       }}
                     >
-                      {"les "}
-                      <Text
-                        style={{
-                          color: slide.lines![i].highlightColor,
-                          fontFamily: FontFamily.headingBold,
-                        }}
-                      >
-                        {slide.lines![i].highlight}
-                      </Text>
-                      {" " + l.suffix}
+                      {slide.tag}
                     </Text>
-                  ))}
+                  )}
+                  <Text
+                    style={{
+                      fontFamily: FontFamily.headingBold,
+                      fontSize: slide.id === "n21" ? FontSize["2xl"] : FontSize.xl,
+                      color: slide.darkText ? "#0F172A" : "white",
+                      lineHeight: (slide.id === "n21" ? FontSize["2xl"] : FontSize.xl) * 1.2,
+                    }}
+                  >
+                    {slide.title}
+                    {slide.titleHighlight && (
+                      <Text style={{ color: "#1B9DD9", backgroundColor: slide.id === "cv" ? "white" : "transparent" }}>
+                        {slide.titleHighlight}
+                      </Text>
+                    )}
+                    {slide.id === "bonneinfo" && (
+                      <Text style={{ color: slide.darkText ? "#0F172A" : "white" }}>{" "}info</Text>
+                    )}
+                    {slide.id === "cv" && (
+                      <Text style={{ color: "#0F172A" }}>{" "}à jours{"\n"}pour les recruteurs</Text>
+                    )}
+                  </Text>
+                  {slide.lines && (
+                    <View style={{ marginTop: 6, gap: 2 }}>
+                      {[{ suffix: "conseils" }, { suffix: "réflexes" }, { suffix: "habitudes" }, { suffix: "gestes" }].map((l, i) => (
+                        <Text key={i} style={{ fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm, color: "#334155" }}>
+                          {"les "}
+                          <Text style={{ color: slide.lines![i].highlightColor, fontFamily: FontFamily.headingBold }}>
+                            {slide.lines![i].highlight}
+                          </Text>
+                          {" " + l.suffix}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={{
+                      marginTop: Spacing["3"],
+                      backgroundColor: slide.darkText ? "#1B9DD9" : "rgba(255,255,255,0.22)",
+                      borderRadius: Radius.sm,
+                      paddingHorizontal: Spacing["4"],
+                      paddingVertical: Spacing["2"],
+                      alignSelf: "flex-start",
+                      borderWidth: slide.darkText ? 0 : 1,
+                      borderColor: "rgba(255,255,255,0.45)",
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ fontFamily: FontFamily.headingBold, fontSize: FontSize.sm, color: "white" }}>
+                      {slide.button}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-              )}
-
-              {/* Bouton */}
-              <TouchableOpacity
-                style={{
-                  marginTop: Spacing["3"],
-                  backgroundColor: slide.darkText
-                    ? "#1B9DD9"
-                    : "rgba(255,255,255,0.22)",
-                  borderRadius: Radius.sm,
-                  paddingHorizontal: Spacing["4"],
-                  paddingVertical: Spacing["2"],
-                  alignSelf: "flex-start",
-                  borderWidth: slide.darkText ? 0 : 1,
-                  borderColor: "rgba(255,255,255,0.45)",
-                }}
-                activeOpacity={0.8}
-              >
-                <Text
+                <View
                   style={{
-                    fontFamily: FontFamily.headingBold,
-                    fontSize: FontSize.sm,
-                    color: "white",
+                    width: 85, height: 95,
+                    backgroundColor: slide.darkText ? "rgba(27,157,217,0.12)" : "rgba(255,255,255,0.15)",
+                    borderRadius: Radius.md,
+                    alignItems: "center", justifyContent: "center",
+                    marginLeft: Spacing["2"],
                   }}
                 >
-                  {slide.button}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Icône droite */}
-            <View
-              style={{
-                width: 85,
-                height: 95,
-                backgroundColor: slide.darkText
-                  ? "rgba(27,157,217,0.12)"
-                  : "rgba(255,255,255,0.15)",
-                borderRadius: Radius.md,
-                alignItems: "center",
-                justifyContent: "center",
-                marginLeft: Spacing["2"],
-              }}
-            >
-              <Feather
-                name={slide.icon}
-                size={30}
-                color={slide.darkText ? "#1B9DD9" : "white"}
-                style={{ opacity: 0.9 }}
-              />
-              {[60, 48, 54].map((w, i) => (
-                <View
-                  key={i}
-                  style={{
-                    width: w,
-                    height: 3,
-                    backgroundColor: slide.darkText
-                      ? `rgba(27,157,217,${i === 0 ? 0.5 : 0.25})`
-                      : `rgba(255,255,255,${i === 0 ? 0.6 : 0.35})`,
-                    borderRadius: 2,
-                    marginTop: i === 0 ? 10 : 5,
-                  }}
-                />
-              ))}
-            </View>
-          </LinearGradient>
+                  <Feather name={slide.icon} size={30} color={slide.darkText ? "#1B9DD9" : "white"} style={{ opacity: 0.9 }} />
+                  {[60, 48, 54].map((w, i) => (
+                    <View key={i} style={{
+                      width: w, height: 3, borderRadius: 2, marginTop: i === 0 ? 10 : 5,
+                      backgroundColor: slide.darkText ? `rgba(27,157,217,${i === 0 ? 0.5 : 0.25})` : `rgba(255,255,255,${i === 0 ? 0.6 : 0.35})`,
+                    }} />
+                  ))}
+                </View>
+              </LinearGradient>
+            )}
+          </TouchableOpacity>
         )}
       />
 
@@ -1113,12 +1094,26 @@ const PromoBannerCard: React.FC = () => {
 
 // ─── Petit banner publicitaire ────────────────────────────────────
 
+const PHARMA_AD_IMAGES = [
+  "https://api.santeafrique.net/storage/ads/Db1ALHHzcI4lsYxQV7pgEleau0qy9hQPAoQsfqmy.jpg",
+  "https://api.santeafrique.net/storage/ads/K7kA63FwZ9yPq3FCxNhLDPYXjVtX8Y06e6gdWv6H.jpg",
+  "https://api.santeafrique.net/storage/ads/ECLOeWwP7Sux52YkOa5GxLo6lSDR33lmjNAadTx3.jpg",
+  "https://api.santeafrique.net/storage/ads/Zc4vkwx2fWuxbBD6xbyHk1Nw8lwCRqOTdKjpDN3Z.jpg",
+];
+const PHARMA_AD_URL = "https://www.pharma-consults.com/";
+let _adIndex = 0;
+
 const SmallAdBanner: React.FC = () => {
   const { colors } = useTheme();
+  const [imgUrl] = useState(() => {
+    const url = PHARMA_AD_IMAGES[_adIndex % PHARMA_AD_IMAGES.length];
+    _adIndex++;
+    return url;
+  });
+  const [imgHeight, setImgHeight] = useState(90);
+
   return (
-    <View
-      style={{ marginHorizontal: Spacing["4"], marginVertical: Spacing["3"] }}
-    >
+    <View style={{ marginHorizontal: Spacing["4"], marginVertical: Spacing["3"] }}>
       <Text
         style={{
           fontFamily: FontFamily.body,
@@ -1131,73 +1126,21 @@ const SmallAdBanner: React.FC = () => {
       >
         Publicité
       </Text>
-      <LinearGradient
-        colors={["#1B9DD9", "#0C7EBA"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{
-          borderRadius: Radius.md,
-          flexDirection: "row",
-          alignItems: "center",
-          paddingHorizontal: Spacing["4"],
-          paddingVertical: Spacing["3"],
-          gap: Spacing["3"],
-        }}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => Linking.openURL(PHARMA_AD_URL)}
+        style={{ backgroundColor: "#fff", borderRadius: Radius.md, overflow: "hidden" }}
       >
-        <View
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: Radius.sm,
-            backgroundColor: "rgba(255,255,255,0.18)",
-            alignItems: "center",
-            justifyContent: "center",
+        <Image
+          source={{ uri: imgUrl }}
+          style={{ width: BANNER_W, height: imgHeight }}
+          resizeMode="cover"
+          onLoad={(e) => {
+            const { width, height } = e.nativeEvent.source;
+            setImgHeight(Math.min(Math.round(BANNER_W * height / width), 200));
           }}
-        >
-          <Feather name="activity" size={22} color="white" />
-        </View>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text
-            style={{
-              fontFamily: FontFamily.headingBold,
-              fontSize: FontSize.base,
-              color: "white",
-            }}
-          >
-            PharmaConsults
-          </Text>
-          <Text
-            style={{
-              fontFamily: FontFamily.body,
-              fontSize: FontSize.sm,
-              color: "rgba(255,255,255,0.82)",
-            }}
-          >
-            Consultez un professionnel de santé
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={{
-            backgroundColor: "rgba(255,255,255,0.2)",
-            borderRadius: Radius.sm,
-            paddingHorizontal: Spacing["3"],
-            paddingVertical: Spacing["2"],
-            borderWidth: 1,
-            borderColor: "rgba(255,255,255,0.4)",
-          }}
-          activeOpacity={0.8}
-        >
-          <Text
-            style={{
-              fontFamily: FontFamily.headingBold,
-              fontSize: FontSize.xs,
-              color: "white",
-            }}
-          >
-            Voir
-          </Text>
-        </TouchableOpacity>
-      </LinearGradient>
+        />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -1450,6 +1393,8 @@ interface HomeScreenProps {
   onSearchPress?: () => void;
   onNotificationPress?: () => void;
   notificationCount?: number;
+  onMagazinePress?: () => void;
+  onJobsPress?: () => void;
 }
 
 const makeStyles = (C: ThemeColors) =>
@@ -1500,6 +1445,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onSearchPress,
   onNotificationPress,
   notificationCount = 0,
+  onMagazinePress,
+  onJobsPress,
 }) => {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
@@ -1517,6 +1464,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     useState<Article[]>(MOCK_PLUS_LUS);
   const [videos, setVideos] = useState<ApiVideo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [preferredSlugs, setPreferredSlugs] = useState<string[]>([]);
+
+  // Charge les thèmes d'intérêt de l'utilisateur
+  useEffect(() => {
+    getPreferredSlugs().then(setPreferredSlugs);
+  }, []);
 
   // Vide le cache au 1er montage pour forcer le chargement des données fraîches
   useEffect(() => {
@@ -1640,9 +1593,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         }) as Article,
     );
 
+    const nonHeroArticles = articles.filter((a) => !heroIds.has(a.id));
+
+    // Thèmes préférés en premier dans la grille
+    const sortByPreference = (list: Article[]) => {
+      if (preferredSlugs.length === 0) return list;
+      const pref = list.filter((a) => preferredSlugs.includes(a.category as string));
+      const rest = list.filter((a) => !preferredSlugs.includes(a.category as string));
+      return [...pref, ...rest];
+    };
+
     const gridArticles = [
       ...heroGridArticles,
-      ...articles.filter((a) => !heroIds.has(a.id)),
+      ...sortByPreference(nonHeroArticles),
     ];
 
     let pairCount = 0;
@@ -1661,16 +1624,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       pairCount++;
     }
     return items;
-  }, [showRating, heroArticles, articles]);
+  }, [showRating, heroArticles, articles, preferredSlugs]);
 
   const articlesFeed = useMemo<FeedItem[]>(() => {
     const items: FeedItem[] = [{ type: "category_filter" }];
-    filteredArticles.forEach((article, i) => {
+
+    // Si aucun filtre manuel : trier les articles des thèmes préférés en premier
+    let ordered = filteredArticles;
+    if (!selectedCategory && preferredSlugs.length > 0) {
+      const preferred = filteredArticles.filter(
+        (a) => preferredSlugs.includes(a.category as string),
+      );
+      const rest = filteredArticles.filter(
+        (a) => !preferredSlugs.includes(a.category as string),
+      );
+      ordered = [...preferred, ...rest];
+    }
+
+    ordered.forEach((article, i) => {
       if (i > 0 && i % 4 === 0) items.push({ type: "small_banner" });
       items.push({ type: "article", data: article });
     });
     return items;
-  }, [filteredArticles]);
+  }, [filteredArticles, selectedCategory, preferredSlugs]);
 
   const renderItem: ListRenderItem<FeedItem> = useCallback(
     ({ item }) => {
@@ -1724,7 +1700,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           return <SmallAdBanner />;
 
         case "promo_banner":
-          return <PromoBannerCard />;
+          return (
+            <PromoBannerCard
+              onNavigate={(target) => {
+                if (target === 'magazine') onMagazinePress?.();
+                else onJobsPress?.();
+              }}
+            />
+          );
 
         case "rating":
           return <RatingWidget onDismiss={() => setRatingDismissed(true)} />;
@@ -1756,18 +1739,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       styles.pair,
       mostReadArticles,
       videos,
+      onMagazinePress,
+      onJobsPress,
     ],
   );
 
   if (loading) {
     return (
-      <View
-        style={[
-          styles.container,
-          { alignItems: "center", justifyContent: "center" },
-        ]}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={styles.container}>
+        <AppHeader onSearchPress={onSearchPress} onNotificationPress={onNotificationPress} notificationCount={notificationCount} />
+        <HomeScreenSkeleton />
       </View>
     );
   }

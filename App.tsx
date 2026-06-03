@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { requestPushPermissions, getUnreadCount } from './src/services/notifications';
+import {
+  requestPushPermissions,
+  getUnreadCount,
+  sendPushTokenToServer,
+  setupNotificationListeners,
+} from './src/services/notifications';
 import { fetchArticles } from './src/services/api';
 import { Feather } from '@expo/vector-icons';
 
@@ -168,12 +173,28 @@ function AppContent() {
   const { colors, toggleTheme, isDark } = useTheme();
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const go = (screen: Screen, params?: NavState['params']) =>
+    setNav({ screen, params });
+
   useEffect(() => {
-    requestPushPermissions();
+    // 1. Demande permission + envoie le token au serveur Laravel
+    requestPushPermissions().then((token) => {
+      if (token) sendPushTokenToServer(token);
+    });
+
+    // 2. Calcul du badge initial depuis les articles récents
     fetchArticles(1).then((res) => {
       const ids = (res?.data ?? []).slice(0, 20).map((a) => String(a.id));
       getUnreadCount(ids).then(setUnreadCount);
     });
+
+    // 3. Listeners push : reçue → +1 badge ; lue (tap) → -1 badge + navigation
+    const cleanup = setupNotificationListeners(
+      () => setUnreadCount((n) => n + 1),
+      () => setUnreadCount((n) => Math.max(0, n - 1)),
+      (articleId) => go('article-detail', { articleId, fromScreen: 'home' }),
+    );
+    return cleanup;
   }, []);
 
   const [fontsLoaded] = useFonts({
@@ -186,9 +207,6 @@ function AppContent() {
     Inter_400Regular,
     Inter_300Light,
   });
-
-  const go = (screen: Screen, params?: NavState['params']) =>
-    setNav({ screen, params });
 
   if (!fontsLoaded) return null;
 
@@ -210,6 +228,8 @@ function AppContent() {
             onSearchPress={() => go('search')}
             onNotificationPress={() => go('notifications')}
             notificationCount={unreadCount}
+            onMagazinePress={() => go('magazine')}
+            onJobsPress={() => go('jobs')}
           />
         );
 

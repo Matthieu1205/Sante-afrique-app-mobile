@@ -12,10 +12,10 @@ import {
   ListRenderItem,
   Modal,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native';
 import { fetchJobs, formatDate } from '@/services/api';
 import type { ApiJob } from '@/services/api';
+import { JobsListSkeleton } from '@/components/common';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -710,10 +710,7 @@ export const JobsScreen: React.FC<JobsScreenProps> = () => {
             <Text style={styles.filtersMainTitle}>Toutes les offres d'emploi</Text>
             <Text style={styles.filtersSub}>Secteur santé en Afrique</Text>
           </View>
-          {loading
-            ? <ActivityIndicator size="small" color={colors.primary} />
-            : <Text style={styles.filtersCountText}>{jobs.length} en ligne</Text>
-          }
+          {!loading && <Text style={styles.filtersCountText}>{jobs.length} en ligne</Text>}
         </View>
 
         <View style={styles.searchRow}>
@@ -840,20 +837,24 @@ export const JobsScreen: React.FC<JobsScreenProps> = () => {
         onPostJob={() => setShowPostJob(true)}
       />
 
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        renderItem={renderJob}
-        ListHeaderComponent={ListHeader}
-        ListFooterComponent={ListFooter}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Feather name="briefcase" size={40} color={colors.textDisabled} />
-            <Text style={styles.emptyText}>Aucune offre ne correspond{'\n'}à votre recherche</Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <JobsListSkeleton />
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          renderItem={renderJob}
+          ListHeaderComponent={ListHeader}
+          ListFooterComponent={ListFooter}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Feather name="briefcase" size={40} color={colors.textDisabled} />
+              <Text style={styles.emptyText}>Aucune offre ne correspond{'\n'}à votre recherche</Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 };

@@ -9,7 +9,7 @@ import {
   ListRenderItem,
   ActivityIndicator,
 } from 'react-native';
-import { ArticleCard, SponsoredCard } from '@/components/common';
+import { ArticleCard, CategoryDetailSkeleton, SponsoredCard } from '@/components/common';
 import type { Article, Category } from '@/components/common';
 import { Feather } from '@expo/vector-icons';
 import { FontFamily, FontSize, Spacing } from '@/theme';
@@ -164,9 +164,7 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({
       </View>
 
       {loading ? (
-        <View style={styles.emptyState}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <CategoryDetailSkeleton />
       ) : rawArticles.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>🔧</Text>

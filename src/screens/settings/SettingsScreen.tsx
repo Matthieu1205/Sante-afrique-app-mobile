@@ -15,7 +15,9 @@ import { FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
 
-const TOPICS_KEY = 'settings_topics_v1';
+import { savePreferredSlugs } from '@/services/preferences';
+
+const TOPICS_KEY     = 'settings_topics_v1';
 const DEFAULT_TOPICS = ['actualites', 'dossiers', 'vaccination'];
 
 interface SettingsScreenProps {
@@ -212,7 +214,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   useEffect(() => {
     AsyncStorage.getItem(TOPICS_KEY).then((raw) => {
-      if (raw) setSelectedTopics(new Set(JSON.parse(raw)));
+      if (raw) setSelectedTopics(new Set(JSON.parse(raw) as string[]));
     });
   }, []);
 
@@ -220,7 +222,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setSelectedTopics((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
-      AsyncStorage.setItem(TOPICS_KEY, JSON.stringify([...next]));
+      // Sauvegarde les IDs bruts (la conversion en slugs se fait dans preferences.ts)
+      savePreferredSlugs([...next]);
       return next;
     });
   };
