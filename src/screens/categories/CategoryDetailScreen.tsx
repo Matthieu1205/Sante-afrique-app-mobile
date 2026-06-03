@@ -18,18 +18,18 @@ import type { ThemeColors } from '@/contexts/ThemeContext';
 import { fetchArticlesByRubrique, formatDate, getImageUrl, resolveRubriqueSlug } from '@/services/api';
 import type { ApiArticle } from '@/services/api';
 
+const norm = (s: string) => s.toLowerCase().replace(/-/g, '_');
+
 function mapArticle(a: ApiArticle): Article {
   return {
     id: String(a.id),
     title: a.title,
     excerpt: a.excerpt,
-    category: a.category?.slug ?? a.category_name?.toLowerCase().replace(/\s+/g, '_') ?? 'actualites',
+    category: norm(a.category?.slug ?? a.category_name?.toLowerCase().replace(/\s+/g, '_') ?? 'actualites'),
     date: formatDate(a.published_at),
     imageUrl: getImageUrl(a) ?? undefined,
   };
 }
-
-const norm = (s: string) => s.toLowerCase().replace(/-/g, '_');
 
 type FeedItem = { type: 'article'; data: Article } | { type: 'sponsored' };
 

@@ -11,6 +11,7 @@ import type { ThemeColors } from "@/contexts/ThemeContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { ApiArticle, ApiBanner, ApiVideo } from "@/services/api";
 import {
+  clearCache,
   fetchArticles,
   fetchBanners,
   fetchVideos,
@@ -122,15 +123,17 @@ const TYPE_BADGE: Record<string, { letter: string; color: string }> = {
   vaccination: { letter: "V", color: "#0891B2" },
 };
 
+// L'API retourne des slugs avec tirets (sante-maternelle) mais CAT_CONFIG utilise des underscores
+function normSlug(s: string | null | undefined): string {
+  return (s ?? "actualites").replace(/-/g, "_");
+}
+
 function mapArticle(a: ApiArticle): Article {
   return {
     id: String(a.id),
     title: a.title,
     excerpt: a.excerpt,
-    category:
-      a.category?.slug ??
-      a.category_name?.toLowerCase().replace(/\s+/g, "_") ??
-      "actualites",
+    category: normSlug(a.category?.slug ?? a.category_name?.toLowerCase().replace(/\s+/g, "_")),
     date: formatDate(a.published_at),
     imageUrl: getImageUrl(a) ?? undefined,
   };
@@ -140,7 +143,7 @@ function mapHero(a: ApiArticle): HeroData {
   return {
     id: String(a.id),
     title: a.title,
-    category: a.category?.slug ?? "actualites",
+    category: normSlug(a.category?.slug),
     hasAudio: false,
     imageUrl: getImageUrl(a) ?? undefined,
   };
@@ -812,18 +815,15 @@ const BANNER_W = W - Spacing["4"] * 2;
 
 function mapApiBanner(b: ApiBanner): BannerSlide {
   return {
-    id: b.id,
-    tag: b.tag,
-    title: b.title,
+    id:             String(b.id),
+    tag:            b.tag ?? "",
+    title:          b.title,
     titleHighlight: b.title_highlight ?? undefined,
-    lines: undefined,
-    button: b.button_text,
-    icon: "file-text",
-    colors: [b.color_start ?? "#1B9DD9", b.color_end ?? "#0C7EBA"] as [
-      string,
-      string,
-    ],
-    darkText: b.dark_text,
+    lines:          undefined,
+    button:         b.button_text ?? b.cta_text ?? "Lire",
+    icon:           "file-text",
+    colors:         [b.color_start ?? "#1B9DD9", b.color_end ?? "#0C7EBA"] as [string, string],
+    darkText:       b.dark_text ?? false,
   };
 }
 
@@ -1517,6 +1517,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     useState<Article[]>(MOCK_PLUS_LUS);
   const [videos, setVideos] = useState<ApiVideo[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Vide le cache au 1er montage pour forcer le chargement des données fraîches
+  useEffect(() => {
+    clearCache();
+  }, []);
 
   useEffect(() => {
     fetchVideos().then((data) => setVideos(data));

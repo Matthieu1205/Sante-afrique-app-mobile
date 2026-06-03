@@ -103,8 +103,11 @@ async function apiFetch<T>(path: string, cacheKey?: string, ttl = CACHE_TTL): Pr
 
 // ─── API functions ────────────────────────────────────────────────
 
-export async function fetchArticles(page = 1): Promise<PaginatedResponse<ApiArticle> | null> {
-  return apiFetch<PaginatedResponse<ApiArticle>>(`/articles?page=${page}`, `articles_p${page}`);
+export async function fetchArticles(page = 1, perPage = 30): Promise<PaginatedResponse<ApiArticle> | null> {
+  return apiFetch<PaginatedResponse<ApiArticle>>(
+    `/articles?page=${page}&per_page=${perPage}`,
+    `articles_p${page}_n${perPage}`,
+  );
 }
 
 export async function fetchArticlesByRubrique(rubrique: string, page = 1): Promise<PaginatedResponse<ApiArticle> | null> {
