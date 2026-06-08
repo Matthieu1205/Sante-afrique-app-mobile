@@ -3,13 +3,13 @@ import { ArticleCard, ArticleDetailSkeleton, ArticleTypeBadge, CategoryBadge } f
 import { FontFamily, FontSize, Radius, Spacing } from "@/theme";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { ThemeColors } from "@/contexts/ThemeContext";
-import { fetchArticleDetail, formatDate, getImageUrl } from "@/services/api";
+import { fetchArticleDetail, fetchArticlesByRubrique, formatDate, getImageUrl } from "@/services/api";
 import { addBookmark, categoryLabel, isBookmarked, removeBookmark, typeLabel } from "@/services/bookmarks";
 import { Feather } from "@expo/vector-icons";
 import * as Speech from 'expo-speech';
 import React, { useEffect, useRef, useState } from "react";
+import WebView from 'react-native-webview';
 import {
-  ActivityIndicator,
   Dimensions,
   Image,
   Linking,
@@ -73,6 +73,7 @@ interface ArticleDetail extends Article {
   content: string[];
   tags: string[];
   canonicalUrl?: string;
+  rawBody?: string;
 }
 
 const MOCK_DETAIL: ArticleDetail = {
@@ -370,6 +371,107 @@ const makeStyles = (C: ThemeColors, fontScale = 1) => StyleSheet.create({
   relatedTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize.lg, color: C.textPrimary, paddingHorizontal: Spacing["4"], paddingVertical: Spacing["3"] },
 });
 
+// ─── Rendu HTML du corps de l'article ────────────────────────────
+
+const ArticleBodyWebView: React.FC<{
+  html: string;
+  isDark: boolean;
+  fontScale: number;
+}> = React.memo(({ html, isDark, fontScale }) => {
+  const [height, setHeight] = useState(200);
+
+  const basePx   = Math.round(16 * fontScale);
+  const textClr  = isDark ? '#D1D5DB' : '#374151';
+  const titleClr = isDark ? '#F9FAFB' : '#111827';
+  const quoteClr = isDark ? '#9CA3AF' : '#6B7280';
+  const quoteBg  = isDark ? '#374151' : '#F0F9FF';
+  const borderClr= isDark ? '#374151' : '#E5E7EB';
+  const thBg     = isDark ? '#374151' : '#F3F4F6';
+
+  const css = `
+    * { max-width: 100%; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, system-ui, sans-serif !important;
+      font-size: ${basePx}px;
+      color: ${textClr};
+      line-height: 1.75;
+      margin: 0; padding: 0 4px 16px 4px;
+      background: transparent;
+      word-wrap: break-word;
+      -webkit-text-size-adjust: none;
+    }
+    p { margin: 0.75em 0; }
+    h2 { font-size: 1.25em; font-weight: 700; color: ${titleClr}; margin: 1.2em 0 0.5em; }
+    h3 { font-size: 1.1em;  font-weight: 600; color: ${titleClr}; margin: 1em 0 0.4em;  }
+    img { max-width: 100% !important; height: auto !important; border-radius: 8px; display: block; margin: 12px auto; }
+    a { color: #1B9DD9; }
+    blockquote {
+      border-left: 3px solid #1B9DD9;
+      margin: 1em 0; padding: 0.5em 1em;
+      color: ${quoteClr}; font-style: italic;
+      background: ${quoteBg}; border-radius: 0 6px 6px 0;
+    }
+    ul, ol { padding-left: 1.4em; }
+    li { margin: 0.4em 0; }
+    strong, b { font-weight: 700; }
+    em, i { font-style: italic; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+    td, th { padding: 8px; border: 1px solid ${borderClr}; }
+    th { background: ${thBg}; font-weight: 600; }
+    hr { border: none; border-top: 1px solid ${borderClr}; margin: 1.5em 0; }
+  `;
+
+  // Supprime les font-family inline (Word/CKEditor) et mesure la hauteur
+  const js = `
+    (function() {
+      var els = document.querySelectorAll('[style]');
+      for (var i = 0; i < els.length; i++) {
+        els[i].style.fontFamily = '';
+        els[i].style.lineHeight = '';
+      }
+      function sendH() {
+        window.ReactNativeWebView.postMessage(String(document.body.scrollHeight));
+      }
+      var imgs = document.querySelectorAll('img');
+      if (imgs.length === 0) { sendH(); return; }
+      var done = 0;
+      function onImg() { if (++done >= imgs.length) sendH(); }
+      for (var j = 0; j < imgs.length; j++) {
+        if (imgs[j].complete) onImg();
+        else { imgs[j].addEventListener('load', onImg); imgs[j].addEventListener('error', onImg); }
+      }
+      setTimeout(sendH, 1500);
+    })();
+    true;
+  `;
+
+  const source = {
+    html: `<!DOCTYPE html><html><head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+      <style>${css}</style>
+    </head><body>${html}</body></html>`,
+    baseUrl: 'https://api.santeafrique.net',
+  };
+
+  return (
+    <WebView
+      source={source}
+      scrollEnabled={false}
+      style={{ height, backgroundColor: 'transparent' }}
+      onMessage={(e) => setHeight(parseInt(e.nativeEvent.data) + 32)}
+      injectedJavaScript={js}
+      onShouldStartLoadWithRequest={(req) => {
+        if (req.url !== 'about:blank' && !req.url.startsWith('data:')) {
+          Linking.openURL(req.url);
+          return false;
+        }
+        return true;
+      }}
+    />
+  );
+});
+
 export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
   articleId,
   article: articleProp = MOCK_DETAIL,
@@ -378,13 +480,14 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
   isSubscriber: _isSubscriber = false,
   onSubscribePress: _onSubscribePress,
 }) => {
-  const { colors, fontScale } = useTheme();
+  const { colors, fontScale, isDark } = useTheme();
   const styles = makeStyles(colors, fontScale);
   const [bookmarked, setBookmarked] = useState(false);
   const [article, setArticle] = useState<ArticleDetail>(articleProp);
   const [loading, setLoading] = useState(!!articleId);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [audioSpeed, setAudioSpeed] = useState(1);
+  const [relatedArticles, setRelatedArticles] = useState<Article[]>(RELATED_ARTICLES);
 
   const articleUrl = article.canonicalUrl ?? `https://santeafrique.net/articles/${article.id}`;
 
@@ -462,10 +565,11 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
     setLoading(true);
     fetchArticleDetail(articleId).then((res) => {
       if (!mounted || !res) { setLoading(false); return; }
+      const categorySlug = res.category?.slug ?? 'actualites';
       setArticle({
         id: String(res.id),
         title: res.title,
-        category: res.category?.slug ?? 'actualites',
+        category: categorySlug,
         date: formatDate(res.published_at),
         imageUrl: getImageUrl(res) ?? undefined,
         hasAudio: false,
@@ -474,8 +578,25 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
         content: htmlToText(res.body),
         tags: res.tags ?? [],
         canonicalUrl: res.canonical,
+        rawBody: res.body,
       });
       setLoading(false);
+
+      // Charge les articles similaires de la même catégorie
+      fetchArticlesByRubrique(categorySlug, 1).then((similar) => {
+        if (!mounted || !similar?.data?.length) return;
+        const mapped = similar.data
+          .filter((a) => String(a.id) !== articleId)
+          .slice(0, 3)
+          .map((a) => ({
+            id: String(a.id),
+            title: a.title,
+            category: (a.category?.slug ?? 'actualites').replace(/-/g, '_') as Article['category'],
+            date: formatDate(a.published_at),
+            imageUrl: getImageUrl(a) ?? undefined,
+          }));
+        if (mapped.length > 0) setRelatedArticles(mapped);
+      });
     });
     return () => { mounted = false; };
   }, [articleId]);
@@ -550,9 +671,17 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
             />
           )}
 
-          {article.content.map((paragraph, i) => (
-            <Text key={i} style={styles.paragraph}>{paragraph}</Text>
-          ))}
+          {article.rawBody ? (
+            <ArticleBodyWebView
+              html={article.rawBody}
+              isDark={isDark}
+              fontScale={fontScale}
+            />
+          ) : (
+            article.content.map((paragraph, i) => (
+              <Text key={i} style={styles.paragraph}>{paragraph}</Text>
+            ))
+          )}
 
           <ShareBar title={article.title} url={articleUrl} />
 
@@ -567,7 +696,7 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
 
         <View style={styles.relatedSection}>
           <Text style={styles.relatedTitle}>Articles similaires</Text>
-          {RELATED_ARTICLES.map((rel) => (
+          {relatedArticles.map((rel) => (
             <ArticleCard key={rel.id} article={rel} onPress={() => onArticlePress?.(rel.id)} />
           ))}
         </View>

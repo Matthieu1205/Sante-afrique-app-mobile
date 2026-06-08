@@ -1,3 +1,4 @@
+import { registerUser } from '@/services/api';
 import React, { useState } from 'react';
 import {
   View,
@@ -118,6 +119,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const passwordMatch = confirmPassword === '' || password === confirmPassword;
   const emailValid = email === '' || email.includes('@');
@@ -129,10 +131,17 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
     password === confirmPassword &&
     acceptTerms;
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!canSubmit) return;
     setLoading(true);
-    setTimeout(() => { setLoading(false); onRegister(); }, 1200);
+    setServerError('');
+    const result = await registerUser(firstName, lastName, email, password, country);
+    setLoading(false);
+    if (result.ok) {
+      onRegister();
+    } else {
+      setServerError(result.message);
+    }
   };
 
   return (
@@ -242,6 +251,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
             </Text>
           </TouchableOpacity>
 
+          {serverError ? <Text style={[styles.errorText, { textAlign: 'center' }]}>{serverError}</Text> : null}
           <Button label="Créer mon compte" variant="primary" size="lg" fullWidth loading={loading} disabled={!canSubmit} onPress={handleRegister} style={styles.submitBtn} />
         </View>
 

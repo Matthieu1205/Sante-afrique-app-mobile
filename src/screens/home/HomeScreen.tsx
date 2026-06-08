@@ -10,12 +10,13 @@ import {
 } from "@/components/common";
 import type { ThemeColors } from "@/contexts/ThemeContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import type { ApiArticle, ApiBanner, ApiVideo } from "@/services/api";
+import type { ApiArticle, ApiBanner, ApiVideo, ApiAd } from "@/services/api";
 import {
   clearCache,
   fetchArticles,
   fetchBanners,
   fetchVideos,
+  fetchAds,
   formatDate,
   getImageUrl,
 } from "@/services/api";
@@ -1094,23 +1095,28 @@ const PromoBannerCard: React.FC<{ onNavigate?: (target: 'magazine' | 'jobs') => 
 
 // ─── Petit banner publicitaire ────────────────────────────────────
 
-const PHARMA_AD_IMAGES = [
-  "https://api.santeafrique.net/storage/ads/Db1ALHHzcI4lsYxQV7pgEleau0qy9hQPAoQsfqmy.jpg",
-  "https://api.santeafrique.net/storage/ads/K7kA63FwZ9yPq3FCxNhLDPYXjVtX8Y06e6gdWv6H.jpg",
-  "https://api.santeafrique.net/storage/ads/ECLOeWwP7Sux52YkOa5GxLo6lSDR33lmjNAadTx3.jpg",
-  "https://api.santeafrique.net/storage/ads/Zc4vkwx2fWuxbBD6xbyHk1Nw8lwCRqOTdKjpDN3Z.jpg",
+const PHARMA_AD_FALLBACK: ApiAd[] = [
+  { id: 1, image_url: "https://api.santeafrique.net/storage/ads/Db1ALHHzcI4lsYxQV7pgEleau0qy9hQPAoQsfqmy.jpg", link_url: "https://www.pharma-consults.com/" },
+  { id: 2, image_url: "https://api.santeafrique.net/storage/ads/K7kA63FwZ9yPq3FCxNhLDPYXjVtX8Y06e6gdWv6H.jpg", link_url: "https://www.pharma-consults.com/" },
+  { id: 3, image_url: "https://api.santeafrique.net/storage/ads/ECLOeWwP7Sux52YkOa5GxLo6lSDR33lmjNAadTx3.jpg", link_url: "https://www.pharma-consults.com/" },
+  { id: 4, image_url: "https://api.santeafrique.net/storage/ads/Zc4vkwx2fWuxbBD6xbyHk1Nw8lwCRqOTdKjpDN3Z.jpg", link_url: "https://www.pharma-consults.com/" },
 ];
-const PHARMA_AD_URL = "https://www.pharma-consults.com/";
 let _adIndex = 0;
 
 const SmallAdBanner: React.FC = () => {
   const { colors } = useTheme();
-  const [imgUrl] = useState(() => {
-    const url = PHARMA_AD_IMAGES[_adIndex % PHARMA_AD_IMAGES.length];
-    _adIndex++;
-    return url;
-  });
+  const [ad, setAd] = useState<ApiAd | null>(null);
   const [imgHeight, setImgHeight] = useState(90);
+
+  useEffect(() => {
+    fetchAds().then((ads) => {
+      const pool = ads.length > 0 ? ads : PHARMA_AD_FALLBACK;
+      setAd(pool[_adIndex % pool.length]);
+      _adIndex++;
+    });
+  }, []);
+
+  if (!ad) return null;
 
   return (
     <View style={{ marginHorizontal: Spacing["4"], marginVertical: Spacing["3"] }}>
@@ -1128,11 +1134,11 @@ const SmallAdBanner: React.FC = () => {
       </Text>
       <TouchableOpacity
         activeOpacity={0.9}
-        onPress={() => Linking.openURL(PHARMA_AD_URL)}
+        onPress={() => Linking.openURL(ad.link_url)}
         style={{ backgroundColor: "#fff", borderRadius: Radius.md, overflow: "hidden" }}
       >
         <Image
-          source={{ uri: imgUrl }}
+          source={{ uri: ad.image_url }}
           style={{ width: BANNER_W, height: imgHeight }}
           resizeMode="cover"
           onLoad={(e) => {
@@ -1234,9 +1240,14 @@ const VideoSection: React.FC<{ videos: ApiVideo[] }> = ({ videos }) => {
                   height={PLAYER_H}
                   width={W - Spacing["4"] * 2}
                   play
+                  allowWebViewZoom={false}
                   webViewProps={{
                     allowsInlineMediaPlayback: true,
                     mediaPlaybackRequiresUserAction: false,
+                    javaScriptEnabled: true,
+                    domStorageEnabled: true,
+                    allowsFullscreenVideo: true,
+                    androidLayerType: "hardware",
                   }}
                 />
               )}

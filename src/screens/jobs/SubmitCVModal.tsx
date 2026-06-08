@@ -1,3 +1,4 @@
+import { submitCV } from '@/services/api';
 import React, { useState } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, ScrollView,
@@ -352,6 +353,8 @@ export const SubmitCVModal: React.FC<Props> = ({ visible, onClose }) => {
 
   // État formulaire
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState('');
   const [focused, setFocused] = useState('');
   const [prenom, setPrenom] = useState('');
   const [nom, setNom] = useState('');
@@ -364,7 +367,7 @@ export const SubmitCVModal: React.FC<Props> = ({ visible, onClose }) => {
   const [competences, setCompetences] = useState('');
   const [contrat, setContrat] = useState('');
   const [disponibilite, setDisponibilite] = useState('Immédiate');
-  const [cvFile, setCvFile] = useState<string | null>(null);
+  const [cvFile, setCvFile] = useState<{ uri: string; name: string } | null>(null);
 
   // Pickers visibilité
   const [showPays, setShowPays] = useState(false);
@@ -378,19 +381,34 @@ export const SubmitCVModal: React.FC<Props> = ({ visible, onClose }) => {
         copyToCacheDirectory: true,
       });
       if (!result.canceled && result.assets.length > 0) {
-        setCvFile(result.assets[0].name);
+        const asset = result.assets[0];
+        setCvFile({ uri: asset.uri, name: asset.name });
       }
     } catch {
       Alert.alert('Erreur', 'Impossible d\'ouvrir le sélecteur de fichier.');
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!prenom || !nom || !email || !profession) {
-      Alert.alert('Champs requis', 'Veuillez renseigner votre prénom, nom, email et profession.');
+      setServerError('Veuillez renseigner votre prénom, nom, email et profession.');
       return;
     }
-    setSubmitted(true);
+    setLoading(true);
+    setServerError('');
+    const result = await submitCV({
+      first_name: prenom, last_name: nom, email,
+      phone: telephone, country: pays, city: ville,
+      profession, experience, skills: competences,
+      contract: contrat, availability: disponibilite,
+      cv_uri: cvFile?.uri ?? null, cv_name: cvFile?.name ?? null,
+    });
+    setLoading(false);
+    if (result.ok) {
+      setSubmitted(true);
+    } else {
+      setServerError(result.message);
+    }
   };
 
   const handleClose = () => {
@@ -601,7 +619,7 @@ export const SubmitCVModal: React.FC<Props> = ({ visible, onClose }) => {
                       <Feather name="paperclip" size={24} color={cvFile ? colors.primary : colors.textMuted} />
                       <View style={styles.uploadTextWrap}>
                         <Text style={styles.uploadTitle}>
-                          {cvFile ? cvFile : 'Ajouter votre CV'}
+                          {cvFile != null ? String(cvFile.name) : 'Ajouter votre CV'}
                         </Text>
                         {!cvFile ? (
                           <>
@@ -630,8 +648,11 @@ export const SubmitCVModal: React.FC<Props> = ({ visible, onClose }) => {
 
                   {/* ── Actions ── */}
                   <View style={styles.actionsRow}>
-                    <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85}>
-                      <Text style={styles.submitBtnText}>Enregistrer mon profil</Text>
+                    {serverError ? (
+                      <Text style={{ color: '#EF4444', fontSize: 13, textAlign: 'center', marginBottom: 8 }}>{serverError}</Text>
+                    ) : null}
+                    <TouchableOpacity style={[styles.submitBtn, loading && { opacity: 0.6 }]} onPress={handleSubmit} disabled={loading} activeOpacity={0.85}>
+                      <Text style={styles.submitBtnText}>{loading ? 'Envoi en cours…' : 'Enregistrer mon profil'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.backLink} onPress={handleClose} activeOpacity={0.75}>
                       <Feather name="arrow-left" size={14} color={colors.textSecondary} />

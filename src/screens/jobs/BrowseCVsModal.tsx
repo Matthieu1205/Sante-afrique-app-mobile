@@ -1,7 +1,9 @@
+import { browseCVs } from '@/services/api';
+import type { ApplicantCV } from '@/services/api';
 import React, { useState } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, ScrollView,
-  StyleSheet, StatusBar, TextInput, Alert,
+  StyleSheet, StatusBar, TextInput, Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -301,6 +303,10 @@ export const BrowseCVsModal: React.FC<Props> = ({ visible, onClose, onPostJob })
   const [sortBy, setSortBy] = useState('Plus récents');
   const [perPage, setPerPage] = useState('10');
 
+  const [results, setResults] = useState<ApplicantCV[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+
   const handleEffacer = () => {
     setQuery('');
     setPays('Pays');
@@ -308,6 +314,21 @@ export const BrowseCVsModal: React.FC<Props> = ({ visible, onClose, onPostJob })
     setExpMin('');
     setTypeSouhaite('Type');
     setDispo('Disponibilité');
+    setResults([]);
+    setSearched(false);
+  };
+
+  const handleFilter = async () => {
+    setLoading(true);
+    setSearched(true);
+    const data = await browseCVs({
+      profession: profession !== 'Profession' ? profession : undefined,
+      country:    pays !== 'Pays' ? pays : undefined,
+      experience: expMin || undefined,
+      contract:   typeSouhaite !== 'Type' ? typeSouhaite : undefined,
+    });
+    setResults(data);
+    setLoading(false);
   };
 
   const selectProps = { styles, colors, insets };
@@ -354,7 +375,7 @@ export const BrowseCVsModal: React.FC<Props> = ({ visible, onClose, onPostJob })
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionBtn, styles.actionBtnDark]}
-                  onPress={() => Alert.alert('Export CSV', 'Fonctionnalité réservée aux recruteurs abonnés.')}
+                  onPress={() => Linking.openURL('https://santeafrique.net/offres-emploi')}
                   activeOpacity={0.8}
                 >
                   <Feather name="download" size={12} color="#FFFFFF" />
@@ -449,11 +470,12 @@ export const BrowseCVsModal: React.FC<Props> = ({ visible, onClose, onPostJob })
               {/* Boutons */}
               <View style={styles.filterBtnsRow}>
                 <TouchableOpacity
-                  style={styles.filtreBtn}
-                  onPress={() => Alert.alert('Accès restreint', 'Connectez-vous avec un abonnement recruteur actif pour consulter la base de CV.')}
+                  style={[styles.filtreBtn, loading && { opacity: 0.6 }]}
+                  onPress={handleFilter}
+                  disabled={loading}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.filtreBtnText}>Filtrer</Text>
+                  <Text style={styles.filtreBtnText}>{loading ? 'Recherche…' : 'Filtrer'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.effacerBtn} onPress={handleEffacer} activeOpacity={0.8}>
                   <Text style={styles.effacerBtnText}>Effacer</Text>
@@ -461,19 +483,42 @@ export const BrowseCVsModal: React.FC<Props> = ({ visible, onClose, onPostJob })
               </View>
             </View>
 
-            {/* Bloc accès réservé */}
-            <View style={styles.accessBox}>
-              <Text style={styles.accessText}>
-                Accès réservé. Connectez-vous avec un abonnement recruteur actif pour consulter la base de CV.
-              </Text>
-              <TouchableOpacity
-                style={styles.subscribeBtn}
-                onPress={() => Alert.alert('Abonnement recruteur', 'Rendez-vous sur santeafrique.net pour activer votre abonnement recruteur.')}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.subscribeBtnText}>Activer mon abonnement pour recruter</Text>
-              </TouchableOpacity>
-            </View>
+            {/* Résultats ou accès réservé */}
+            {searched && results.length > 0 ? (
+              <View style={{ paddingHorizontal: Spacing['4'], paddingBottom: Spacing['4'] }}>
+                <Text style={{ fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm, color: colors.textMuted, marginBottom: Spacing['2'] }}>
+                  {results.length} candidat{results.length > 1 ? 's' : ''} trouvé{results.length > 1 ? 's' : ''}
+                </Text>
+                {results.map((cv) => (
+                  <View key={cv.id} style={{ backgroundColor: colors.backgroundCard, borderRadius: 8, padding: Spacing['3'], marginBottom: Spacing['2'], gap: 4 }}>
+                    <Text style={{ fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.base, color: colors.textPrimary }}>{cv.name}</Text>
+                    <Text style={{ fontFamily: FontFamily.body, fontSize: FontSize.sm, color: colors.textMuted }}>{cv.profession} · {cv.experience} · {cv.country}</Text>
+                    {cv.cv_url && (
+                      <TouchableOpacity onPress={() => Linking.openURL(cv.cv_url!)} activeOpacity={0.8}>
+                        <Text style={{ fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm, color: colors.primary }}>Voir le CV →</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </View>
+            ) : searched && !loading ? (
+              <View style={styles.accessBox}>
+                <Text style={styles.accessText}>Aucun candidat ne correspond à vos critères.</Text>
+              </View>
+            ) : !searched ? (
+              <View style={styles.accessBox}>
+                <Text style={styles.accessText}>
+                  Accès réservé aux recruteurs abonnés. Appliquez des filtres et cliquez sur "Filtrer".
+                </Text>
+                <TouchableOpacity
+                  style={styles.subscribeBtn}
+                  onPress={() => Linking.openURL('https://santeafrique.net/offres-emploi')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.subscribeBtnText}>Activer mon abonnement pour recruter</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
           </ScrollView>
         </View>

@@ -16,6 +16,7 @@ import type { ThemeColors } from '@/contexts/ThemeContext';
 
 interface MenuScreenProps {
   isLoggedIn?: boolean;
+  notificationCount?: number;
   onLogin?: () => void;
   onSubscribe?: () => void;
   onCategoryPress?: (category: Category, title: string) => void;
@@ -28,13 +29,17 @@ interface MenuScreenProps {
   onFavoritesPress?: () => void;
   onHistoryPress?: () => void;
   onAboutPress?: () => void;
+  onLogout?: () => void;
+  onLegalPress?: () => void;
+  userName?: string;
+  subscriptionLabel?: string;
 }
 
 const SHORTCUTS: { id: string; icon: React.ComponentProps<typeof Feather>['name']; label: string }[] = [
-  { id: 'login',    icon: 'user',      label: 'Se connecter' },
-  { id: 'prefs',   icon: 'settings',  label: 'Préférences'  },
-  { id: 'alerts',  icon: 'bell',      label: 'Alertes'       },
-  { id: 'rubriques',icon: 'grid',     label: 'Rubriques'    },
+  { id: 'login',     icon: 'user',     label: 'Mon compte'   },
+  { id: 'prefs',    icon: 'settings', label: 'Préférences'  },
+  { id: 'alerts',   icon: 'bell',     label: 'Alertes'      },
+  { id: 'rubriques', icon: 'grid',    label: 'Rubriques'    },
 ];
 
 const CATEGORIES: { value: Category; label: string; icon: React.ComponentProps<typeof Feather>['name'] }[] = [
@@ -171,6 +176,7 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
 
 export const MenuScreen: React.FC<MenuScreenProps> = ({
   isLoggedIn = false,
+  notificationCount = 0,
   onLogin,
   onSubscribe,
   onCategoryPress,
@@ -183,6 +189,10 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
   onFavoritesPress,
   onHistoryPress,
   onAboutPress,
+  onLogout,
+  onLegalPress,
+  userName,
+  subscriptionLabel,
 }) => {
   const { colors, isDark } = useTheme();
   const styles = makeStyles(colors);
@@ -190,7 +200,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
   return (
     <View style={styles.container}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.backgroundCard} />
-      <AppHeader onSearchPress={onSearchPress} onNotificationPress={onNotificationPress} notificationCount={3} />
+      <AppHeader onSearchPress={onSearchPress} onNotificationPress={onNotificationPress} notificationCount={notificationCount} />
 
       <ScrollView showsVerticalScrollIndicator={false}>
 
@@ -238,7 +248,15 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
         <View style={styles.menuGroup}>
           {isLoggedIn ? (
             <>
-              <MenuRow icon="star" label="Mon abonnement" sublabel="Numérique Annuel · 15 000 FCFA/an" onPress={onSubscribe} />
+              {userName ? (
+                <MenuRow icon="user" label={userName} sublabel="Compte connecté" chevron={false} />
+              ) : null}
+              <MenuRow
+                icon="star"
+                label="Mon abonnement"
+                sublabel={subscriptionLabel ?? 'Voir mes offres'}
+                onPress={onSubscribe}
+              />
               <MenuRow icon="bookmark" label="Mes favoris" onPress={onFavoritesPress} />
               <MenuRow icon="clock" label="Historique de lecture" onPress={onHistoryPress} />
             </>
@@ -256,6 +274,10 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
           <MenuRow icon="users" label="Espace Partenaires" sublabel="Solutions B2B pour la santé" onPress={onPartnersPress} />
           <MenuRow icon="settings" label="Paramètres" sublabel="Pays, thème, notifications" onPress={onSettingsPress} />
           <MenuRow icon="info" label="À propos" onPress={onAboutPress} />
+          <MenuRow icon="file-text" label="Mentions légales" onPress={onLegalPress} />
+          {isLoggedIn && (
+            <MenuRow icon="log-out" label="Se déconnecter" chevron={false} onPress={onLogout} />
+          )}
         </View>
 
         <View style={styles.contact}>

@@ -13,7 +13,7 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
-import { fetchJobs, formatDate } from '@/services/api';
+import { fetchJobs, formatDate, getAuthToken } from '@/services/api';
 import type { ApiJob } from '@/services/api';
 import { JobsListSkeleton } from '@/components/common';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -609,15 +609,18 @@ const JobCard: React.FC<{
 interface JobsScreenProps {
   onSearchPress?: () => void;
   onNotificationPress?: () => void;
+  onLogin?: () => void;
+  onSubscribe?: () => void;
 }
 
-export const JobsScreen: React.FC<JobsScreenProps> = () => {
+export const JobsScreen: React.FC<JobsScreenProps> = ({ onLogin, onSubscribe }) => {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const insets = useSafeAreaInsets();
 
   const [jobs, setJobs] = useState<Job[]>(JOBS);
   const [loading, setLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [query, setQuery] = useState('');
   const [activeContract, setActiveContract] = useState(CONTRACT_TYPES[0]);
   const [pays, setPays] = useState(PAYS_OPTIONS[0]);
@@ -631,6 +634,7 @@ export const JobsScreen: React.FC<JobsScreenProps> = () => {
 
   useEffect(() => {
     let mounted = true;
+    getAuthToken().then((t) => { if (mounted) setIsLoggedIn(!!t); });
     fetchJobs().then((res) => {
       if (!mounted) return;
       const all = [...(res?.pinned ?? []), ...(res?.items ?? [])];
@@ -639,6 +643,12 @@ export const JobsScreen: React.FC<JobsScreenProps> = () => {
     });
     return () => { mounted = false; };
   }, []);
+
+  // Vérifie la connexion avant d'ouvrir un modal réservé
+  const requireAuth = (open: () => void) => {
+    if (!isLoggedIn) { onLogin?.(); return; }
+    open();
+  };
 
   const filtered = useMemo(() => {
     let list = jobs.filter((job) => {
@@ -678,7 +688,7 @@ export const JobsScreen: React.FC<JobsScreenProps> = () => {
         <View style={styles.heroButtons}>
           <TouchableOpacity
             style={styles.heroBtn}
-            onPress={() => setShowPostJob(true)}
+            onPress={() => requireAuth(() => setShowPostJob(true))}
             activeOpacity={0.8}
           >
             <Feather name="plus-circle" size={14} color={colors.white} />
@@ -686,7 +696,7 @@ export const JobsScreen: React.FC<JobsScreenProps> = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.heroBtn}
-            onPress={() => setShowSubmitCV(true)}
+            onPress={() => requireAuth(() => setShowSubmitCV(true))}
             activeOpacity={0.8}
           >
             <Feather name="upload" size={14} color={colors.white} />
@@ -694,7 +704,7 @@ export const JobsScreen: React.FC<JobsScreenProps> = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.heroBtn}
-            onPress={() => setShowBrowseCVs(true)}
+            onPress={() => requireAuth(() => setShowBrowseCVs(true))}
             activeOpacity={0.8}
           >
             <Feather name="users" size={14} color={colors.white} />
@@ -829,7 +839,7 @@ export const JobsScreen: React.FC<JobsScreenProps> = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1B9DD9" />
 
-      <PostJobModal visible={showPostJob} onClose={() => setShowPostJob(false)} />
+      <PostJobModal visible={showPostJob} onClose={() => setShowPostJob(false)} onSubscribe={onSubscribe} />
       <SubmitCVModal visible={showSubmitCV} onClose={() => setShowSubmitCV(false)} />
       <BrowseCVsModal
         visible={showBrowseCVs}

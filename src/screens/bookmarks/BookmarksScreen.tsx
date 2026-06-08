@@ -17,12 +17,14 @@ import {
   getBookmarks,
   removeBookmark,
   clearBookmarks,
+  syncWithServer,
   type BookmarkedArticle,
 } from '@/services/bookmarks';
 
 interface BookmarksScreenProps {
   onBack?: () => void;
   onArticlePress?: (id: string) => void;
+  isLoggedIn?: boolean;
 }
 
 const typeColors: Record<string, string> = {
@@ -126,6 +128,7 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
 export const BookmarksScreen: React.FC<BookmarksScreenProps> = ({
   onBack,
   onArticlePress,
+  isLoggedIn = false,
 }) => {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
@@ -133,8 +136,12 @@ export const BookmarksScreen: React.FC<BookmarksScreenProps> = ({
   const [items, setItems] = useState<BookmarkedArticle[]>([]);
 
   useEffect(() => {
-    getBookmarks().then(setItems);
-  }, []);
+    if (isLoggedIn) {
+      syncWithServer().then(setItems);
+    } else {
+      getBookmarks().then(setItems);
+    }
+  }, [isLoggedIn]);
 
   const handleRemove = async (id: string) => {
     await removeBookmark(id);

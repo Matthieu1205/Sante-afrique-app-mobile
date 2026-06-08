@@ -1,3 +1,4 @@
+import { forgotPassword } from '@/services/api';
 import React, { useState } from 'react';
 import {
   View,
@@ -73,13 +74,22 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const emailValid = email.includes('@');
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!emailValid) return;
     setLoading(true);
-    setTimeout(() => { setLoading(false); setSent(true); onSuccess?.(); }, 1200);
+    setServerError('');
+    const result = await forgotPassword(email);
+    setLoading(false);
+    if (result.ok) {
+      setSent(true);
+      onSuccess?.();
+    } else {
+      setServerError(result.message);
+    }
   };
 
   return (
@@ -135,6 +145,7 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
               )}
             </View>
 
+            {serverError ? <Text style={[styles.errorText, { textAlign: 'center' }]}>{serverError}</Text> : null}
             <Button label="Envoyer le lien" variant="primary" size="lg" fullWidth loading={loading} disabled={!emailValid} onPress={handleSubmit} style={styles.submitBtn} />
 
             <TouchableOpacity onPress={onBack} style={styles.cancelRow}>

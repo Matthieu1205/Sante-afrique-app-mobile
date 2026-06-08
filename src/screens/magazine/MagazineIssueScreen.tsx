@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import { Colors, FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
 import type { MagazineIssue } from './MagazineScreen';
+import { fetchMagazineIssueDetail } from '@/services/api';
+import type { ApiMagazineSommaireItem } from '@/services/api';
 
 interface MagazineIssueScreenProps {
   issue: MagazineIssue;
@@ -25,22 +27,33 @@ interface MagazineIssueScreenProps {
 }
 
 const { width: W } = Dimensions.get('window');
-const COVER_W = (W - Spacing['4'] * 2) * 0.44;
+const COVER_W = (W - Spacing['4'] * 2) * 0.42;
 const COVER_H = COVER_W * 1.42;
+const JOURS_FR = ['DIMANCHE', 'LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
+const MOIS_FR  = ['JANVIER','FÉVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOÛT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DÉCEMBRE'];
 
-const SOMMAIRE = [
-  { page: 4,  title: 'Éditorial — Dr. Aminata Koné' },
-  { page: 6,  title: 'Dossier : L\'offensive finale contre le paludisme' },
-  { page: 18, title: 'Entretien : Pr. Jean-Marie Sawadogo, OMS Afrique' },
-  { page: 24, title: 'Vaccin RTS,S : résultats à 3 ans au Ghana' },
-  { page: 30, title: 'Moustiquaires imprégnées : un bilan mitigé' },
-  { page: 36, title: 'One Health : quand l\'environnement fait la loi' },
-  { page: 42, title: 'Business Santé : les start-ups anti-paludéen' },
-  { page: 48, title: 'Tribune : Pour une recherche africaine souveraine' },
+function formatDate(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return `${JOURS_FR[d.getDay()]} ${d.getDate()} ${MOIS_FR[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+const SOMMAIRE_FALLBACK: ApiMagazineSommaireItem[] = [
+  { page: 4,  title: 'Éditorial' },
+  { page: 6,  title: 'Dossier principal' },
+  { page: 18, title: 'Grand entretien' },
+  { page: 30, title: 'Actualités santé' },
+  { page: 42, title: 'Business Santé' },
+  { page: 48, title: 'Tribune' },
 ];
+
+const HERO_BG: [string, string] = ['#0D1B2A', '#0D1B2A'];
 
 const makeStyles = (C: ThemeColors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: C.background },
+
+  // ── Barre de navigation ──────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -55,13 +68,15 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     color: C.white,
     textAlign: 'center',
   },
+
   content: { paddingBottom: 48 },
-  hero: { padding: Spacing['4'], gap: Spacing['4'] },
+
+  // ── Hero ─────────────────────────────────────────────────────────
+  hero: { padding: Spacing['4'], paddingBottom: Spacing['5'] },
   heroInner: { flexDirection: 'row', gap: Spacing['4'], alignItems: 'flex-start' },
+
   cover: {
     borderRadius: Radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
     overflow: 'hidden',
     ...Shadows.card,
   },
@@ -73,60 +88,122 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
   coverNumText: { fontFamily: FontFamily.bodyBold, fontSize: 9, color: C.white },
   coverLogoWrap: { position: 'absolute', bottom: 8 },
   coverLogo: { fontFamily: FontFamily.logo, fontSize: 10, color: 'rgba(255,255,255,0.75)' },
-  meta: { flex: 1, gap: Spacing['2'], paddingTop: Spacing['1'] },
-  metaTitle: { fontFamily: FontFamily.logo, fontSize: 28, color: C.white, letterSpacing: -0.5, lineHeight: 30 },
-  metaLabel: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.7)' },
-  metaTheme: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.9)', lineHeight: 20 },
-  readBtn: {
-    backgroundColor: C.primary,
-    borderRadius: Radius.sm,
-    paddingVertical: Spacing['3'],
-    alignItems: 'center',
+
+  // méta (droite de la couverture)
+  meta: { flex: 1, gap: 6, paddingTop: 4 },
+  metaBadge: {
+    fontFamily: FontFamily.bodyBold,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
   },
-  readBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.white },
-  buyBtn: {
-    backgroundColor: C.primary,
-    borderRadius: Radius.sm,
-    paddingVertical: Spacing['3'],
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
+  metaTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: 30,
+    color: C.white,
+    lineHeight: 32,
+    letterSpacing: -0.5,
   },
-  buyBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.white },
-  actions: {
+  metaNum: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.75)',
+    letterSpacing: 0.3,
+  },
+  metaDate: {
+    fontFamily: FontFamily.bodyBold,
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginTop: 2,
+  },
+  metaTheme: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.55)',
+    lineHeight: 17,
+    marginTop: 4,
+  },
+
+  // ── 3 boutons en ligne ───────────────────────────────────────────
+  btnRow: {
     flexDirection: 'row',
-    marginHorizontal: Spacing['4'],
-    marginTop: Spacing['3'],
-    gap: Spacing['3'],
+    gap: 8,
+    marginTop: Spacing['4'],
   },
-  actionBtn: {
+  // SOMMAIRE — outline blanc sur fond sombre
+  btnSommaire: {
     flex: 1,
-    flexDirection: 'row',
+    paddingVertical: 11,
+    borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing['2'],
-    paddingVertical: Spacing['3'],
-    borderRadius: Radius.sm,
     borderWidth: 1.5,
-    borderColor: C.primary,
-    backgroundColor: C.backgroundCard,
+    borderColor: 'rgba(255,255,255,0.55)',
   },
-  actionBtnActive: { backgroundColor: C.primaryUltraLight },
-  actionBtnIcon: { fontSize: 18, color: C.primary },
-  actionBtnIconActive: { color: C.primaryDark },
-  actionBtnLabel: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.base, color: C.primary },
-  actionBtnLabelActive: { color: C.primaryDark },
-  loginBtn: {
-    marginHorizontal: Spacing['4'],
-    marginTop: Spacing['3'],
-    paddingVertical: Spacing['3'],
-    borderRadius: Radius.sm,
-    borderWidth: 1.5,
-    borderColor: C.primary,
+  btnSommaireText: {
+    fontFamily: FontFamily.bodyBold,
+    fontSize: 10,
+    color: C.white,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  // LIRE (ABONNÉS) — bleu plein
+  btnLire: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 4,
     alignItems: 'center',
-    backgroundColor: C.backgroundCard,
+    justifyContent: 'center',
+    backgroundColor: C.primary,
   },
-  loginBtnText: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.base, color: C.primary },
+  btnLireText: {
+    fontFamily: FontFamily.bodyBold,
+    fontSize: 10,
+    color: C.white,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  // SE CONNECTER — rouge plein
+  btnConnect: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#C0392B',
+  },
+  btnConnectText: {
+    fontFamily: FontFamily.bodyBold,
+    fontSize: 10,
+    color: C.white,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+
+  // ── Extrait ──────────────────────────────────────────────────────
+  extrait: {
+    marginHorizontal: Spacing['4'],
+    marginTop: Spacing['4'],
+    backgroundColor: C.backgroundCard,
+    borderRadius: Radius.md,
+    padding: Spacing['4'],
+    borderWidth: 1,
+    borderColor: C.borderLight,
+    ...Shadows.card,
+  },
+  extraitText: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.base,
+    color: C.textSecondary,
+    lineHeight: 26,
+  },
+
+  // ── Sommaire ─────────────────────────────────────────────────────
   sommaire: {
     marginHorizontal: Spacing['4'],
     marginTop: Spacing['4'],
@@ -137,46 +214,53 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     overflow: 'hidden',
     ...Shadows.card,
   },
+  sommaireHeader: {
+    paddingHorizontal: Spacing['4'],
+    paddingVertical: Spacing['3'],
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderLight,
+  },
   sommaireTitle: {
     fontFamily: FontFamily.headingBold,
     fontSize: FontSize.base,
     color: C.textPrimary,
-    padding: Spacing['4'],
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
   },
   sommaireRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing['3'],
     paddingHorizontal: Spacing['4'],
-    paddingVertical: Spacing['3'],
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: C.borderLight,
   },
-  sommairePageNum: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.sm, color: C.primary, width: 28 },
-  sommaireItemTitle: { flex: 1, fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textSecondary, lineHeight: 20 },
-  extrait: {
-    marginHorizontal: Spacing['4'],
-    marginTop: Spacing['4'],
-    backgroundColor: C.backgroundCard,
-    borderRadius: Radius.md,
-    padding: Spacing['4'],
-    gap: Spacing['3'],
-    borderWidth: 1,
-    borderColor: C.borderLight,
-    ...Shadows.card,
+  sommaireBullet: {
+    fontFamily: FontFamily.bodyBold,
+    fontSize: FontSize.sm,
+    color: C.primary,
+    lineHeight: 20,
+    width: 24,
+    textAlign: 'center',
   },
-  extraitTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize.base, color: C.textPrimary },
-  extraitText: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textSecondary, lineHeight: 26 },
-  extraitCta: {
-    backgroundColor: C.primary,
-    borderRadius: Radius.sm,
+  sommaireItemTitle: {
+    flex: 1,
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: C.textSecondary,
+    lineHeight: 20,
+  },
+  sommaireMore: {
+    paddingHorizontal: Spacing['4'],
     paddingVertical: Spacing['3'],
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing['2'],
+    gap: Spacing['2'],
   },
-  extraitCtaText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.white },
+  sommaireMoreText: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: FontSize.sm,
+    color: C.primary,
+  },
 });
 
 export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
@@ -188,12 +272,27 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
-  const [tab, setTab] = useState<'info' | 'sommaire' | 'extrait'>('info');
+  const [sommaire, setSommaire] = useState<ApiMagazineSommaireItem[]>(SOMMAIRE_FALLBACK);
+  const [extrait, setExtrait] = useState<string | null>(null);
+  const [detailDate, setDetailDate] = useState<string | undefined>(issue.publishedAt);
+
+  useEffect(() => {
+    fetchMagazineIssueDetail(Number(issue.id)).then((detail) => {
+      if (detail?.sommaire?.length) setSommaire(detail.sommaire);
+      if (detail?.extrait) setExtrait(detail.extrait);
+      if (detail?.date) setDetailDate(detail.date);
+    });
+  }, [issue.id]);
+
+  const visibleItems = sommaire;
+  const hiddenCount  = 0;
+  const dateFormatted = formatDate(detailDate);
 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
+      {/* Barre de navigation */}
       <LinearGradient
         colors={[Colors.primary, Colors.primaryDark]}
         style={[styles.header, { paddingTop: insets.top + Spacing['2'] }]}
@@ -209,11 +308,11 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
-        <LinearGradient
-          colors={['#1A2A3A', '#0D1B2A']}
-          style={styles.hero}
-        >
+        {/* ── Hero foncé ─────────────────────────────────────────── */}
+        <LinearGradient colors={HERO_BG} style={styles.hero}>
+
           <View style={styles.heroInner}>
+            {/* Couverture */}
             {issue.coverImage ? (
               <View style={[styles.cover, { width: COVER_W, height: COVER_H }]}>
                 <Image source={issue.coverImage} style={{ width: COVER_W, height: COVER_H }} resizeMode="cover" />
@@ -221,9 +320,8 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
             ) : (
               <LinearGradient
                 colors={issue.color}
-                style={[styles.cover, { width: COVER_W, height: COVER_H }]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+                style={[styles.cover, { width: COVER_W, height: COVER_H, alignItems: 'center', justifyContent: 'center' }]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               >
                 <View style={styles.coverNumBadge}>
                   <Text style={styles.coverNumText}>N°{issue.number}</Text>
@@ -235,73 +333,62 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
               </LinearGradient>
             )}
 
+            {/* Méta */}
             <View style={styles.meta}>
-              <Text style={styles.metaTitle}>Santé{'\n'}Afrique</Text>
-              <Text style={styles.metaLabel}>{issue.label}</Text>
-              <Text style={styles.metaTheme}>{issue.theme}</Text>
+              <Text style={styles.metaBadge}>Numéro en cours</Text>
+              <Text style={styles.metaTitle}>Santé Afrique</Text>
+              <Text style={styles.metaNum}>{issue.label}</Text>
+              {dateFormatted ? (
+                <Text style={styles.metaDate}>{dateFormatted}</Text>
+              ) : null}
+              {issue.theme ? (
+                <Text style={styles.metaTheme}>{issue.theme}</Text>
+              ) : null}
             </View>
           </View>
 
-          {issue.free ? (
-            <TouchableOpacity style={styles.readBtn} activeOpacity={0.85}>
-              <Text style={styles.readBtnText}>Lire gratuitement</Text>
+          {/* 3 boutons : SOMMAIRE | LIRE (ABONNÉS) | SE CONNECTER */}
+          <View style={styles.btnRow}>
+            <TouchableOpacity style={styles.btnSommaire} activeOpacity={0.8}>
+              <Text style={styles.btnSommaireText}>Sommaire</Text>
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.buyBtn} onPress={onSubscribe} activeOpacity={0.85}>
-              <Text style={styles.buyBtnText}>Acheter – {issue.price}</Text>
+            <TouchableOpacity style={styles.btnLire} onPress={onSubscribe} activeOpacity={0.85}>
+              <Text style={styles.btnLireText}>{'Lire\n(Abonnés)'}</Text>
             </TouchableOpacity>
-          )}
+            <TouchableOpacity style={styles.btnConnect} onPress={onLogin} activeOpacity={0.85}>
+              <Text style={styles.btnConnectText}>Se connecter</Text>
+            </TouchableOpacity>
+          </View>
+
         </LinearGradient>
 
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.actionBtn, tab === 'sommaire' && styles.actionBtnActive]}
-            onPress={() => setTab(tab === 'sommaire' ? 'info' : 'sommaire')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.actionBtnIcon, tab === 'sommaire' && styles.actionBtnIconActive]}>≡</Text>
-            <Text style={[styles.actionBtnLabel, tab === 'sommaire' && styles.actionBtnLabelActive]}>Sommaire</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionBtn, tab === 'extrait' && styles.actionBtnActive]}
-            onPress={() => setTab(tab === 'extrait' ? 'info' : 'extrait')}
-            activeOpacity={0.8}
-          >
-            <Feather name="eye" size={18} color={tab === 'extrait' ? colors.primaryDark : colors.primary} />
-            <Text style={[styles.actionBtnLabel, tab === 'extrait' && styles.actionBtnLabelActive]}>Extrait</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={styles.loginBtn} onPress={onLogin} activeOpacity={0.8}>
-          <Text style={styles.loginBtnText}>Déjà abonné ? Se connecter</Text>
-        </TouchableOpacity>
-
-        {tab === 'sommaire' && (
-          <View style={styles.sommaire}>
-            <Text style={styles.sommaireTitle}>Au sommaire</Text>
-            {SOMMAIRE.map((item) => (
-              <View key={item.page} style={styles.sommaireRow}>
-                <Text style={styles.sommairePageNum}>{item.page}</Text>
-                <Text style={styles.sommaireItemTitle}>{item.title}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {tab === 'extrait' && (
+        {/* Extrait si disponible */}
+        {extrait ? (
           <View style={styles.extrait}>
-            <Text style={styles.extraitTitle}>Extrait — Éditorial</Text>
-            <Text style={styles.extraitText}>
-              {`Le paludisme tue encore. Chaque année, plus de 600 000 personnes perdent la vie à cause de cette maladie — dont 94 % en Afrique subsaharienne. Pourtant, des signaux encourageants émergent.\n\nDepuis 2023, le vaccin RTS,S est déployé dans plusieurs pays d'Afrique de l'Ouest. Les thérapies combinées à base d'artémisinine montrent des taux d'efficacité supérieurs à 94 %. Et pour la première fois, des financements publics africains commencent à se substituer aux aides étrangères dans la lutte contre le vecteur.\n\nCe numéro 12 dresse un état des lieux complet : où en sommes-nous vraiment ? Quelles sont les nouvelles armes disponibles ? Et surtout — comment l'Afrique peut-elle enfin prendre la main sur sa propre santé ?\n\n— Dr. Aminata Koné, Rédactrice en chef`}
-            </Text>
-            {!issue.free && (
-              <TouchableOpacity style={styles.extraitCta} onPress={onSubscribe} activeOpacity={0.85}>
-                <Text style={styles.extraitCtaText}>Lire la suite · S'abonner</Text>
-              </TouchableOpacity>
-            )}
+            <Text style={styles.extraitText}>{extrait}</Text>
           </View>
-        )}
+        ) : null}
+
+        {/* Sommaire */}
+        <View style={styles.sommaire}>
+          <View style={styles.sommaireHeader}>
+            <Text style={styles.sommaireTitle}>— Au sommaire</Text>
+          </View>
+
+          {visibleItems.map((item, idx) => (
+            <View key={`${idx}-${item.page}`} style={styles.sommaireRow}>
+              <Text style={styles.sommaireBullet}>{idx + 1}</Text>
+              <Text style={styles.sommaireItemTitle}>{item.title}</Text>
+            </View>
+          ))}
+
+          {hiddenCount > 0 && (
+            <TouchableOpacity style={styles.sommaireMore} onPress={onSubscribe} activeOpacity={0.7}>
+              <Text style={styles.sommaireMoreText}>+ {hiddenCount} autres articles</Text>
+              <Feather name="chevron-right" size={14} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
 
       </ScrollView>
     </View>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   StatusBar,
   Linking,
 } from 'react-native';
+import { fetchArticles } from '@/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -136,6 +137,15 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({ onBack }) => {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const styles = makeStyles(colors);
+  const [articleCount, setArticleCount] = useState<string>('1 200+');
+
+  useEffect(() => {
+    fetchArticles(1, 1).then((res) => {
+      if (res?.total && res.total > 0) {
+        setArticleCount(`${res.total.toLocaleString('fr-FR')}+`);
+      }
+    });
+  }, []);
 
   const openUrl = (url: string) => Linking.openURL(url).catch(() => null);
 
@@ -189,7 +199,7 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({ onBack }) => {
           {[
             { value: '9', label: 'Pays couverts' },
             { value: '50K+', label: 'Lecteurs / mois' },
-            { value: '1 200+', label: 'Articles publiés' },
+            { value: articleCount, label: 'Articles publiés' },
           ].map((s) => (
             <View key={s.label} style={styles.statItem}>
               <Text style={styles.statValue}>{s.value}</Text>

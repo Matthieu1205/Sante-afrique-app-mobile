@@ -6,7 +6,8 @@ import {
   sendPushTokenToServer,
   setupNotificationListeners,
 } from './src/services/notifications';
-import { fetchArticles } from './src/services/api';
+import { fetchArticles, getAuthToken, logoutUser, fetchUserProfile } from './src/services/api';
+import type { UserProfile } from './src/services/api';
 import { Feather } from '@expo/vector-icons';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -49,6 +50,7 @@ import { SubscriptionScreen } from './src/screens/subscription/SubscriptionScree
 import { JobsScreen } from './src/screens/jobs/JobsScreen';
 import { PartnersScreen } from './src/screens/partners/PartnersScreen';
 import { KitMediaScreen } from './src/screens/partners/KitMediaScreen';
+import { LegalScreen } from './src/screens/legal/LegalScreen';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import type { Category } from './src/components/common';
 
@@ -76,7 +78,8 @@ type Screen =
   | 'subscription'
   | 'jobs'
   | 'partners'
-  | 'kit-media';
+  | 'kit-media'
+  | 'legal';
 
 interface NavState {
   screen: Screen;
@@ -86,6 +89,9 @@ interface NavState {
     articleId?: string;
     fromScreen?: Screen;
     issue?: MagazineIssue;
+    legalTitle?: string;
+    legalUrl?: string;
+    legalHideChrome?: boolean;
   };
 }
 
@@ -172,11 +178,30 @@ function AppContent() {
   const [nav, setNav] = useState<NavState>({ screen: 'splash' });
   const { colors, toggleTheme, isDark } = useTheme();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   const go = (screen: Screen, params?: NavState['params']) =>
     setNav({ screen, params });
 
+  const handleLogin = (dest: Screen = 'home') => {
+    setIsLoggedIn(true);
+    fetchUserProfile().then(setUserProfile);
+    go(dest);
+  };
+
+  const handleLogout = async () => {
+    await logoutUser();
+    setIsLoggedIn(false);
+    setUserProfile(null);
+    go('home');
+  };
+
   useEffect(() => {
+    getAuthToken().then((t) => {
+      setIsLoggedIn(!!t);
+      if (t) fetchUserProfile().then(setUserProfile);
+    });
     // 1. Demande permission + envoie le token au serveur Laravel
     requestPushPermissions().then((token) => {
       if (token) sendPushTokenToServer(token);
@@ -306,7 +331,15 @@ function AppContent() {
       case 'menu':
         return (
           <MenuScreen
-            onLogin={() => go('gateway')}
+            isLoggedIn={isLoggedIn}
+            notificationCount={unreadCount}
+            userName={userProfile?.name}
+            subscriptionLabel={
+              userProfile?.subscription?.is_active
+                ? userProfile.subscription.plan
+                : undefined
+            }
+            onLogin={() => go('login')}
             onSubscribe={() => go('subscription')}
             onCategoryPress={(cat, title) =>
               go('category-detail', { category: cat, categoryTitle: title })
@@ -318,7 +351,9 @@ function AppContent() {
             onPartnersPress={() => go('partners')}
             onSettingsPress={() => go('settings')}
             onFavoritesPress={() => go('bookmarks')}
-            onAboutPress={() => go('about')}
+            onAboutPress={() => go('legal', { legalTitle: 'À propos', legalUrl: 'https://santeafrique.net/a-propos', legalHideChrome: true })}
+            onLogout={handleLogout}
+            onLegalPress={() => go('legal', { legalTitle: 'Mentions légales', legalUrl: 'https://santeafrique.net/mentions-legales' })}
           />
         );
 
@@ -334,17 +369,17 @@ function AppContent() {
       case 'login':
         return (
           <LoginScreen
-            onLogin={() => go('home')}
+            onLogin={() => handleLogin('menu')}
             onRegister={() => go('subscription')}
             onForgotPassword={() => go('forgot-password')}
-            onBack={() => go('gateway')}
+            onBack={() => go('menu')}
           />
         );
 
       case 'register':
         return (
           <RegisterScreen
-            onRegister={() => go('home')}
+            onRegister={() => handleLogin('home')}
             onLogin={() => go('login')}
             onBack={() => go('gateway')}
           />
@@ -360,6 +395,7 @@ function AppContent() {
       case 'bookmarks':
         return (
           <BookmarksScreen
+            isLoggedIn={isLoggedIn}
             onBack={() => go('menu')}
             onArticlePress={(id) => go('article-detail', { articleId: id, fromScreen: 'bookmarks' })}
           />
@@ -398,6 +434,8 @@ function AppContent() {
           <JobsScreen
             onSearchPress={() => go('search')}
             onNotificationPress={() => go('notifications')}
+            onLogin={() => go('gateway')}
+            onSubscribe={() => go('subscription')}
           />
         );
 
@@ -412,6 +450,16 @@ function AppContent() {
 
       case 'kit-media':
         return <KitMediaScreen onBack={() => go('partners')} />;
+
+      case 'legal':
+        return (
+          <LegalScreen
+            title={params?.legalTitle ?? 'Mentions légales'}
+            url={params?.legalUrl ?? 'https://santeafrique.net/mentions-legales'}
+            hideChrome={params?.legalHideChrome}
+            onBack={() => go('menu')}
+          />
+        );
 
       case 'about':
         return <AboutScreen onBack={() => go('menu')} />;

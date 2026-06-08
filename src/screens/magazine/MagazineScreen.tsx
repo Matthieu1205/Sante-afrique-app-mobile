@@ -1,3 +1,8 @@
+import { MagazineSkeleton } from "@/components/common";
+import type { ThemeColors } from "@/contexts/ThemeContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import type { ApiMagazineIssue } from "@/services/api";
+import { fetchMagazineIssues, clearMagazineCache } from "@/services/api";
 import {
   Colors,
   FontFamily,
@@ -6,13 +11,10 @@ import {
   Shadows,
   Spacing,
 } from "@/theme";
-import { useTheme } from "@/contexts/ThemeContext";
-import type { ThemeColors } from "@/contexts/ThemeContext";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Dimensions,
   FlatList,
@@ -26,9 +28,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { fetchMagazineIssues } from "@/services/api";
-import type { ApiMagazineIssue } from "@/services/api";
-import { MagazineSkeleton } from "@/components/common";
 
 const COVER_COLORS: [string, string][] = [
   ["#1E3A5F", "#0A2540"],
@@ -41,15 +40,16 @@ const COVER_COLORS: [string, string][] = [
 
 function mapApiIssue(a: ApiMagazineIssue, idx: number): MagazineIssue {
   return {
-    id:         String(a.id),
-    number:     a.number,
-    label:      a.label,
-    theme:      a.theme,
-    free:       a.free,
-    price:      a.price,
-    color:      COVER_COLORS[idx % COVER_COLORS.length],
-    icon:       "book-open",
+    id: String(a.id),
+    number: a.number,
+    label: (a.label ?? a.title ?? `N°${a.number}`),
+    theme: (a.theme ?? ''),
+    free: a.free,
+    price: (a.price ?? ''),
+    color: COVER_COLORS[idx % COVER_COLORS.length],
+    icon: "book-open",
     coverImage: a.cover_url ? { uri: a.cover_url } : undefined,
+    publishedAt: a.date,
   };
 }
 
@@ -63,6 +63,7 @@ export interface MagazineIssue {
   color: [string, string];
   icon: React.ComponentProps<typeof Feather>["name"];
   coverImage?: any;
+  publishedAt?: string;
 }
 
 interface MagazineScreenProps {
@@ -75,8 +76,9 @@ interface MagazineScreenProps {
 }
 
 const { width: W } = Dimensions.get("window");
-const DRAWER_W = W * 0.72;
 const CARD_W = (W - Spacing["4"] * 2 - Spacing["3"]) / 2;
+const HERO_COVER_W = W * 0.62;
+const HERO_COVER_H = HERO_COVER_W * 1.38;
 
 export const ISSUES: MagazineIssue[] = [
   {
@@ -116,7 +118,8 @@ export const ISSUES: MagazineIssue[] = [
     id: "18",
     number: 18,
     label: "N°18 • Mars–Avril 2025",
-    theme: "Approche One Health en Côte d'Ivoire : la vision du Dr Djeneba Ouattara",
+    theme:
+      "Approche One Health en Côte d'Ivoire : la vision du Dr Djeneba Ouattara",
     free: false,
     price: "1 550 FCFA",
     color: ["#166534", "#052E16"],
@@ -136,7 +139,7 @@ export const ISSUES: MagazineIssue[] = [
   },
 ];
 
-// ─── Couverture magazine ── (gradient-based, colors.white only)
+// ─── Couverture magazine ──────────────────────────────────────────
 
 export const IssueCover: React.FC<{
   issue: MagazineIssue;
@@ -147,7 +150,11 @@ export const IssueCover: React.FC<{
   if (issue.coverImage) {
     return (
       <View style={[cvr.wrap, { width, height }]}>
-        <Image source={issue.coverImage} style={{ width, height }} resizeMode="cover" />
+        <Image
+          source={issue.coverImage}
+          style={{ width, height }}
+          resizeMode="cover"
+        />
         {showLock && !issue.free && (
           <View style={cvr.lock}>
             <Feather name="lock" size={16} color={Colors.white} />
@@ -198,25 +205,39 @@ const cvr = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  numText: { fontFamily: FontFamily.bodyBold, fontSize: 10, color: Colors.white },
+  numText: {
+    fontFamily: FontFamily.bodyBold,
+    fontSize: 10,
+    color: Colors.white,
+  },
   logoWrap: { position: "absolute", bottom: 8 },
-  logo: { fontFamily: FontFamily.logo, fontSize: 11, color: "rgba(255,255,255,0.75)" },
+  logo: {
+    fontFamily: FontFamily.logo,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.75)",
+  },
   logoW: { color: Colors.white },
 });
 
 // ─── Carte grille ─────────────────────────────────────────────────
 
-const makeGcStyles = (C: ThemeColors) => StyleSheet.create({
-  card: {
-    backgroundColor: C.backgroundCard,
-    borderRadius: Radius.md,
-    overflow: "hidden",
-    ...Shadows.card,
-  },
-  info: { padding: Spacing["2"], gap: 3 },
-  label: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textMuted },
-  theme: { fontFamily: FontFamily.headingBold, fontSize: FontSize.sm, color: C.textPrimary, lineHeight: 17 },
-});
+const makeGcStyles = (C: ThemeColors) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: C.backgroundCard,
+      borderRadius: Radius.sm,
+      overflow: "hidden",
+      ...Shadows.card,
+    },
+    label: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.xs,
+      color: C.textMuted,
+      paddingHorizontal: Spacing["2"],
+      paddingVertical: Spacing["2"],
+      textAlign: "center",
+    },
+  });
 
 const IssueCard: React.FC<{ issue: MagazineIssue; onPress: () => void }> = ({
   issue,
@@ -231,17 +252,16 @@ const IssueCard: React.FC<{ issue: MagazineIssue; onPress: () => void }> = ({
       activeOpacity={0.85}
     >
       <IssueCover issue={issue} width={CARD_W} height={CARD_W * 1.38} />
-      <View style={gc.info}>
-        <Text style={gc.label}>{issue.label}</Text>
-        <Text style={gc.theme} numberOfLines={2}>
-          {issue.theme}
-        </Text>
-      </View>
+      <Text style={gc.label} numberOfLines={1}>
+        {issue.label}
+      </Text>
     </TouchableOpacity>
   );
 };
 
-// ─── Drawer menu ── (always primary blue bg — theme-invariant)
+// ─── Drawer menu ──────────────────────────────────────────────────
+
+const DRAWER_W = W * 0.72;
 
 const DRAWER_ITEMS: {
   icon: React.ComponentProps<typeof Feather>["name"];
@@ -295,7 +315,6 @@ const DrawerMenu: React.FC<{
         <TouchableWithoutFeedback onPress={onClose}>
           <View style={dr.backdrop} />
         </TouchableWithoutFeedback>
-
         <Animated.View
           style={[
             dr.drawer,
@@ -312,9 +331,7 @@ const DrawerMenu: React.FC<{
             <Feather name="arrow-left" size={22} color={Colors.white} />
             <Text style={dr.backLabel}>Retour</Text>
           </TouchableOpacity>
-
           <View style={dr.divider} />
-
           {DRAWER_ITEMS.map((item) => (
             <TouchableOpacity
               key={item.key}
@@ -351,7 +368,11 @@ const dr = StyleSheet.create({
     paddingVertical: Spacing["4"],
     gap: Spacing["3"],
   },
-  backLabel: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.base, color: Colors.white },
+  backLabel: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: FontSize.base,
+    color: Colors.white,
+  },
   divider: {
     height: 1,
     backgroundColor: "rgba(255,255,255,0.2)",
@@ -365,97 +386,153 @@ const dr = StyleSheet.create({
     paddingVertical: Spacing["4"],
     gap: Spacing["4"],
   },
-  itemLabel: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.lg, color: Colors.white },
+  itemLabel: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: FontSize.lg,
+    color: Colors.white,
+  },
 });
 
 // ─── Écran principal ──────────────────────────────────────────────
 
 type TabKey = "kiosk" | "mine";
 
-const makeStyles = (C: ThemeColors) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.background },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing["4"],
-    paddingBottom: Spacing["3"],
-  },
-  menuBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: {
-    flex: 1,
-    fontFamily: FontFamily.logo,
-    fontSize: FontSize.xl,
-    color: "rgba(255,255,255,0.85)",
-    textAlign: "center",
-    letterSpacing: -0.3,
-  },
-  headerTitleW: { color: C.white },
-  list: { paddingBottom: 80 },
-  row: { paddingHorizontal: Spacing["4"], gap: Spacing["3"], marginBottom: Spacing["3"] },
-  hero: {
-    marginHorizontal: Spacing["4"],
-    marginTop: Spacing["4"],
-    marginBottom: Spacing["2"],
-    borderRadius: Radius.md,
-    overflow: "hidden",
-    ...Shadows.card,
-  },
-  heroLabel: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize.base,
-    color: C.textPrimary,
-    textAlign: "center",
-    paddingVertical: Spacing["2"],
-    backgroundColor: C.backgroundCard,
-  },
-  archiveTitle: {
-    fontFamily: FontFamily.bodyBold,
-    fontSize: FontSize.xs,
-    color: C.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    paddingHorizontal: Spacing["4"],
-    paddingTop: Spacing["4"],
-    paddingBottom: Spacing["3"],
-  },
-  emptyMine: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing["3"],
-    paddingHorizontal: Spacing["8"],
-    paddingBottom: 80,
-  },
-  emptyTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize.lg, color: C.textPrimary, textAlign: "center" },
-  emptySub: { fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textMuted, textAlign: "center", lineHeight: 22 },
-  subBtn: {
-    backgroundColor: C.primary,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing["6"],
-    paddingVertical: Spacing["3"],
-    marginTop: Spacing["2"],
-  },
-  subBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.white },
-  bottomBar: {
-    flexDirection: "row",
-    backgroundColor: C.backgroundCard,
-    borderTopWidth: 1,
-    borderTopColor: C.borderLight,
-    paddingTop: 8,
-    elevation: 8,
-  },
-  bottomTab: { flex: 1, alignItems: "center", gap: 3 },
-  bottomTabLabel: { fontFamily: FontFamily.body, fontSize: 10, color: C.textMuted },
-  bottomTabLabelActive: { fontFamily: FontFamily.bodySemiBold, color: C.primary },
-  bottomTabDot: {
-    position: "absolute",
-    top: -4,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: C.primary,
-  },
-});
+const makeStyles = (C: ThemeColors) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: C.background },
+
+    topBar: {
+      backgroundColor: C.backgroundCard,
+      borderBottomWidth: 1,
+      borderBottomColor: C.borderLight,
+    },
+    menuRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: Spacing["4"],
+      paddingVertical: Spacing["2"],
+    },
+    menuBtn: {
+      width: 36,
+      height: 36,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    logoText: {
+      fontFamily: FontFamily.logo,
+      fontSize: FontSize.lg,
+      color: C.textPrimary,
+    },
+    logoW: { color: C.primary },
+
+    // Liste
+    list: { paddingBottom: 140 },
+    row: {
+      paddingHorizontal: Spacing["4"],
+      gap: Spacing["3"],
+      marginBottom: Spacing["3"],
+    },
+
+    // Hero (grande couverture)
+    heroSection: {
+      backgroundColor: Colors.primary,
+      paddingTop: Spacing["2"],
+      paddingBottom: Spacing["3"],
+      alignItems: "center",
+    },
+    heroWrap: {
+      ...Shadows.card,
+      borderRadius: Radius.sm,
+      overflow: "hidden",
+    },
+    heroLabel: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: C.textMuted,
+      textAlign: "center",
+      marginBottom: Spacing["4"],
+      marginTop: Spacing["3"],
+    },
+
+    // Section archives
+    archiveTitle: {
+      fontFamily: FontFamily.bodyBold,
+      fontSize: FontSize.xs,
+      color: C.textMuted,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      paddingHorizontal: Spacing["4"],
+      paddingTop: Spacing["2"],
+      paddingBottom: Spacing["3"],
+      borderTopWidth: 1,
+      borderTopColor: C.borderLight,
+      marginTop: Spacing["2"],
+    },
+
+    // Onglet Mes éditions vide
+    emptyMine: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: Spacing["3"],
+      paddingHorizontal: Spacing["8"],
+      paddingBottom: 80,
+    },
+    emptyTitle: {
+      fontFamily: FontFamily.headingBold,
+      fontSize: FontSize.lg,
+      color: C.textPrimary,
+      textAlign: "center",
+    },
+    emptySub: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.base,
+      color: C.textMuted,
+      textAlign: "center",
+      lineHeight: 22,
+    },
+    subBtn: {
+      backgroundColor: C.primary,
+      borderRadius: Radius.sm,
+      paddingHorizontal: Spacing["6"],
+      paddingVertical: Spacing["3"],
+      marginTop: Spacing["2"],
+    },
+    subBtnText: {
+      fontFamily: FontFamily.bodyBold,
+      fontSize: FontSize.base,
+      color: C.white,
+    },
+
+    // Barre du bas
+    bottomBar: {
+      flexDirection: "row",
+      backgroundColor: C.backgroundCard,
+      borderTopWidth: 1,
+      borderTopColor: C.borderLight,
+      paddingTop: 2,
+      elevation: 8,
+    },
+    bottomTab: { flex: 1, alignItems: "center", gap: 1 },
+    bottomTabLabel: {
+      fontFamily: FontFamily.body,
+      fontSize: 7,
+      color: C.textMuted,
+    },
+    bottomTabLabelActive: {
+      fontFamily: FontFamily.bodySemiBold,
+      color: C.primary,
+    },
+    bottomTabDot: {
+      position: "absolute",
+      top: -4,
+      width: 4,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: C.primary,
+    },
+  });
 
 export const MagazineScreen: React.FC<MagazineScreenProps> = ({
   onBack,
@@ -468,16 +545,19 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+
   const [tab, setTab] = useState<TabKey>("kiosk");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [issues, setIssues] = useState<MagazineIssue[]>(ISSUES);
   const [loadingIssues, setLoadingIssues] = useState(true);
 
   useEffect(() => {
-    fetchMagazineIssues().then((data) => {
-      if (data.length > 0) setIssues(data.map(mapApiIssue));
-      setLoadingIssues(false);
-    });
+    clearMagazineCache().then(() =>
+      fetchMagazineIssues().then((data) => {
+        if (data.length > 0) setIssues(data.map(mapApiIssue));
+        setLoadingIssues(false);
+      })
+    );
   }, []);
 
   const latest = issues[0];
@@ -485,7 +565,10 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={colors.backgroundCard}
+      />
 
       <DrawerMenu
         visible={drawerOpen}
@@ -496,56 +579,67 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
         onAbout={onAbout}
       />
 
-      <LinearGradient
-        colors={[Colors.primary, Colors.primaryDark]}
-        style={[styles.header, { paddingTop: insets.top + Spacing["2"] }]}
-      >
-        <TouchableOpacity
-          style={styles.menuBtn}
-          onPress={() => setDrawerOpen(true)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Feather name="menu" size={24} color={colors.white} />
-        </TouchableOpacity>
+      {/* ── En-tête ────────────────────────────────────────────── */}
+      <View style={[styles.topBar, { paddingTop: insets.top }]}>
+        {/* Ligne logo + menu */}
+        <View style={styles.menuRow}>
+          <TouchableOpacity
+            style={styles.menuBtn}
+            onPress={() => setDrawerOpen(true)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="menu" size={22} color={colors.textPrimary} />
+          </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>
-          santé <Text style={styles.headerTitleW}>afrique</Text>
-        </Text>
+          <Text style={styles.logoText}>
+            santé <Text style={styles.logoW}>afrique</Text>
+          </Text>
 
-        <View style={{ width: 40 }} />
-      </LinearGradient>
+          <View style={{ width: 36 }} />
+        </View>
+      </View>
 
+      {/* ── Contenu ────────────────────────────────────────────── */}
       {tab === "kiosk" ? (
-        loadingIssues ? <MagazineSkeleton /> :
-        <FlatList
-          data={archives}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
-            <IssueCard issue={item} onPress={() => onIssuePress?.(item)} />
-          )}
-          ListHeaderComponent={
-            <>
-              <TouchableOpacity
-                style={styles.hero}
-                onPress={() => onIssuePress?.(latest)}
-                activeOpacity={0.9}
-              >
-                <IssueCover
-                  issue={latest}
-                  width={W - Spacing["4"] * 2}
-                  height={(W - Spacing["4"] * 2) * 0.55}
-                  showLock={false}
-                />
+        loadingIssues ? (
+          <MagazineSkeleton />
+        ) : (
+          <FlatList
+            key="grid-2cols"
+            data={archives}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            columnWrapperStyle={styles.row}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.list}
+            renderItem={({ item }) => (
+              <IssueCard issue={item} onPress={() => onIssuePress?.(item)} />
+            )}
+            ListHeaderComponent={
+              <>
+                {/* Section hero fond bleu */}
+                <View style={styles.heroSection}>
+                  <TouchableOpacity
+                    onPress={() => onIssuePress?.(latest)}
+                    activeOpacity={0.9}
+                    style={styles.heroWrap}
+                  >
+                    <IssueCover
+                      issue={latest}
+                      width={HERO_COVER_W}
+                      height={HERO_COVER_H}
+                      showLock={false}
+                    />
+                  </TouchableOpacity>
+                </View>
+
                 <Text style={styles.heroLabel}>{latest.label}</Text>
-              </TouchableOpacity>
-              <Text style={styles.archiveTitle}>Numéros précédents</Text>
-            </>
-          }
-        />
+
+                <Text style={styles.archiveTitle}>Numéros précédents</Text>
+              </>
+            }
+          />
+        )
       ) : (
         <View style={styles.emptyMine}>
           <Feather name="book-open" size={52} color={colors.textMuted} />
@@ -563,19 +657,15 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
         </View>
       )}
 
-      <View
-        style={[
-          styles.bottomBar,
-          { paddingBottom: Math.max(insets.bottom, 8) },
-        ]}
-      >
+      {/* ── Barre de navigation du bas ─────────────────────────── */}
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom - 28 }]}>
         <TouchableOpacity
           style={styles.bottomTab}
           onPress={() => setTab("kiosk")}
         >
           <Feather
             name="book-open"
-            size={22}
+            size={14}
             color={tab === "kiosk" ? colors.primary : colors.textMuted}
           />
           <Text
@@ -588,13 +678,14 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
           </Text>
           {tab === "kiosk" && <View style={styles.bottomTabDot} />}
         </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.bottomTab}
           onPress={() => setTab("mine")}
         >
           <Feather
             name="download"
-            size={22}
+            size={14}
             color={tab === "mine" ? colors.primary : colors.textMuted}
           />
           <Text

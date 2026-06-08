@@ -1,7 +1,8 @@
+import { postJob } from '@/services/api';
 import React, { useState } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, ScrollView,
-  TextInput, StyleSheet, StatusBar, KeyboardAvoidingView, Platform, Alert,
+  TextInput, StyleSheet, StatusBar, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -74,6 +75,12 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     marginTop: Spacing['5'], marginBottom: Spacing['4'],
   },
   submitBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: '#FFFFFF' },
+  subscribeBtn: {
+    backgroundColor: '#059669', borderRadius: Radius.md,
+    paddingVertical: Spacing['4'], alignItems: 'center',
+    marginTop: Spacing['3'], marginBottom: Spacing['2'],
+  },
+  subscribeBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: '#FFFFFF' },
   successWrap: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: Spacing['4'] },
   successIcon: {
     width: 72, height: 72, borderRadius: 36,
@@ -96,14 +103,17 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
   doneBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: '#FFFFFF' },
 });
 
-interface Props { visible: boolean; onClose: () => void; }
+interface Props { visible: boolean; onClose: () => void; onSubscribe?: () => void; }
 
-export const PostJobModal: React.FC<Props> = ({ visible, onClose }) => {
+export const PostJobModal: React.FC<Props> = ({ visible, onClose, onSubscribe }) => {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const insets = useSafeAreaInsets();
 
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState('');
+  const [needsSub, setNeedsSub] = useState(false);
   const [focused, setFocused] = useState('');
 
   const [titre, setTitre] = useState('');
@@ -116,16 +126,33 @@ export const PostJobModal: React.FC<Props> = ({ visible, onClose }) => {
   const [description, setDescription] = useState('');
   const [email, setEmail] = useState('');
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!titre || !entreprise || !contrat || !email) {
-      Alert.alert('Champs requis', 'Veuillez remplir au minimum le titre, l\'entreprise, le type de contrat et l\'email.');
+      setServerError('Veuillez remplir le titre, l\'entreprise, le type de contrat et l\'email.');
       return;
     }
-    setSubmitted(true);
+    setLoading(true);
+    setServerError('');
+    const result = await postJob({
+      title: titre, company: entreprise, type: contrat,
+      location: ville || pays, country: pays, email,
+      experience, description,
+    });
+    setLoading(false);
+    if (result.ok) {
+      setSubmitted(true);
+    } else if (result.needsSubscription) {
+      setNeedsSub(true);
+      setServerError(result.message);
+    } else {
+      setServerError(result.message);
+    }
   };
 
   const handleClose = () => {
     setSubmitted(false);
+    setNeedsSub(false);
+    setServerError('');
     setTitre(''); setEntreprise(''); setContrat(''); setPays('');
     setVille(''); setProfession(''); setExperience('');
     setDescription(''); setEmail('');
@@ -262,9 +289,18 @@ export const PostJobModal: React.FC<Props> = ({ visible, onClose }) => {
                     onFocus={() => setFocused('email')} onBlur={() => setFocused('')}
                   />
 
-                  <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85}>
-                    <Text style={styles.submitBtnText}>Soumettre l'offre</Text>
-                  </TouchableOpacity>
+                  {serverError ? (
+                    <Text style={{ color: colors.error ?? '#EF4444', fontSize: 13, textAlign: 'center', marginBottom: 8 }}>{serverError}</Text>
+                  ) : null}
+                  {needsSub ? (
+                    <TouchableOpacity style={styles.subscribeBtn} onPress={() => { handleClose(); onSubscribe?.(); }} activeOpacity={0.85}>
+                      <Text style={styles.subscribeBtnText}>S'abonner pour poster une offre</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity style={[styles.submitBtn, loading && { opacity: 0.6 }]} onPress={handleSubmit} disabled={loading} activeOpacity={0.85}>
+                      <Text style={styles.submitBtnText}>{loading ? 'Envoi en cours…' : 'Soumettre l\'offre'}</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </ScrollView>
             )}

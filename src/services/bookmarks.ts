@@ -1,4 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  fetchServerBookmarks,
+  addServerBookmark,
+  removeServerBookmark,
+  fetchArticleDetail,
+  formatDate,
+  getImageUrl,
+} from './api';
 
 const KEY = 'bookmarks_v1';
 
@@ -40,15 +48,59 @@ export async function addBookmark(article: BookmarkedArticle): Promise<void> {
   const items = await load();
   if (items.some((b) => b.id === article.id)) return;
   await save([article, ...items]);
+  addServerBookmark(article.id); // best-effort, fire-and-forget
 }
 
 export async function removeBookmark(id: string): Promise<void> {
   const items = await load();
   await save(items.filter((b) => b.id !== id));
+  removeServerBookmark(id); // best-effort, fire-and-forget
 }
 
 export async function clearBookmarks(): Promise<void> {
   await save([]);
+}
+
+/**
+ * Appelée au chargement de BookmarksScreen quand l'utilisateur est connecté.
+ * - Envoie au serveur les favoris locaux non encore synchronisés.
+ * - Rapatrie les favoris serveur absents du local (ex. ajoutés sur le web).
+ */
+export async function syncWithServer(): Promise<BookmarkedArticle[]> {
+  const [localItems, serverIds] = await Promise.all([load(), fetchServerBookmarks()]);
+  if (!serverIds.length && !localItems.length) return localItems;
+
+  const localIdSet = new Set(localItems.map((b) => b.id));
+  const serverIdSet = new Set(serverIds);
+
+  // Local → server : push les favoris non encore sur le serveur
+  const toUpload = localItems.filter((b) => !serverIdSet.has(b.id));
+  toUpload.forEach((b) => addServerBookmark(b.id));
+
+  // Server → local : récupère les articles présents sur le serveur mais pas en local
+  const toDownload = serverIds.filter((id) => !localIdSet.has(id));
+  const fetched = await Promise.all(
+    toDownload.map(async (id): Promise<BookmarkedArticle | null> => {
+      const article = await fetchArticleDetail(id);
+      if (!article) return null;
+      return {
+        id: String(article.id),
+        title: article.title,
+        category: categoryLabel(article.category?.slug ?? ''),
+        date: formatDate(article.published_at),
+        readTime: '5 min',
+        type: typeLabel(article.category?.slug),
+        imageUrl: getImageUrl(article) ?? undefined,
+      };
+    }),
+  );
+
+  const downloaded = fetched.filter((b): b is BookmarkedArticle => b !== null);
+  if (!downloaded.length) return localItems;
+
+  const merged = [...downloaded, ...localItems];
+  await save(merged);
+  return merged;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────
