@@ -70,8 +70,14 @@ interface MagazineScreenProps {
   onBack?: () => void;
   onSubscribe?: () => void;
   onLogin?: () => void;
+  onProfile?: () => void;
+  isLoggedIn?: boolean;
+  userName?: string;
   onSettings?: () => void;
   onAbout?: () => void;
+  onLegal?: () => void;
+  onPrivacy?: () => void;
+  onConsent?: () => void;
   onIssuePress?: (issue: MagazineIssue) => void;
 }
 
@@ -271,7 +277,12 @@ const DrawerMenu: React.FC<{
   onAccount?: () => void;
   onSettings?: () => void;
   onAbout?: () => void;
-}> = ({ visible, onClose, onBack, onAccount, onSettings, onAbout }) => {
+  onLegal?: () => void;
+  onPrivacy?: () => void;
+  onConsent?: () => void;
+  isLoggedIn?: boolean;
+  userName?: string;
+}> = ({ visible, onClose, onBack, onAccount, onSettings, onAbout, onLegal, onPrivacy, onConsent, isLoggedIn = false, userName }) => {
   const insets = useSafeAreaInsets();
   const slideX = useRef(new Animated.Value(-DRAWER_W)).current;
 
@@ -288,6 +299,9 @@ const DrawerMenu: React.FC<{
     if (key === "account") onAccount?.();
     if (key === "settings") onSettings?.();
     if (key === "about") onAbout?.();
+    if (key === "legal") onLegal?.();
+    if (key === "privacy") onPrivacy?.();
+    if (key === "consent") onConsent?.();
   };
 
   if (!visible) return null;
@@ -320,17 +334,34 @@ const DrawerMenu: React.FC<{
             <Text style={dr.backLabel}>Retour</Text>
           </TouchableOpacity>
           <View style={dr.divider} />
-          {DRAWER_ITEMS.map((item) => (
-            <TouchableOpacity
-              key={item.key}
-              style={dr.item}
-              onPress={() => handleItem(item.key)}
-              activeOpacity={0.75}
-            >
-              <Feather name={item.icon} size={20} color={Colors.white} />
-              <Text style={dr.itemLabel}>{item.label}</Text>
+          {isLoggedIn && userName ? (
+            <TouchableOpacity style={dr.userSection} onPress={() => handleItem('account')} activeOpacity={0.8}>
+              <View style={dr.avatarCircle}>
+                <Text style={dr.avatarInitials}>
+                  {userName.trim().split(/\s+/).map((w) => w[0] ?? '').slice(0, 2).join('').toUpperCase()}
+                </Text>
+              </View>
+              <View>
+                <Text style={dr.userName}>{userName}</Text>
+                <Text style={dr.userSub}>Compte connecté</Text>
+              </View>
             </TouchableOpacity>
-          ))}
+          ) : null}
+          {DRAWER_ITEMS.map((item) => {
+            const isAccount = item.key === 'account';
+            if (isAccount && isLoggedIn) return null;
+            return (
+              <TouchableOpacity
+                key={item.key}
+                style={dr.item}
+                onPress={() => handleItem(item.key)}
+                activeOpacity={0.75}
+              >
+                <Feather name={item.icon} size={20} color={Colors.white} />
+                <Text style={dr.itemLabel}>{item.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </Animated.View>
       </View>
     </Modal>
@@ -378,6 +409,43 @@ const dr = StyleSheet.create({
     fontFamily: FontFamily.bodySemiBold,
     fontSize: FontSize.lg,
     color: Colors.white,
+  },
+  userSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing['5'],
+    paddingVertical: Spacing['4'],
+    gap: Spacing['3'],
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.15)',
+    marginBottom: Spacing['2'],
+  },
+  avatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  avatarInitials: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.base,
+    color: Colors.white,
+    letterSpacing: 0.5,
+  },
+  userName: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.base,
+    color: Colors.white,
+  },
+  userSub: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 2,
   },
 });
 
@@ -526,8 +594,14 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
   onBack,
   onSubscribe,
   onLogin,
+  onProfile,
+  isLoggedIn = false,
+  userName,
   onSettings,
   onAbout,
+  onLegal,
+  onPrivacy,
+  onConsent,
   onIssuePress,
 }) => {
   const insets = useSafeAreaInsets();
@@ -562,9 +636,14 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
         visible={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onBack={onBack}
-        onAccount={onLogin}
+        onAccount={isLoggedIn ? onProfile : onLogin}
+        isLoggedIn={isLoggedIn}
+        userName={userName}
         onSettings={onSettings}
         onAbout={onAbout}
+        onLegal={onLegal}
+        onPrivacy={onPrivacy}
+        onConsent={onConsent}
       />
 
       {/* ── En-tête ────────────────────────────────────────────── */}

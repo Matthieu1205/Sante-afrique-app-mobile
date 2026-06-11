@@ -328,10 +328,16 @@ function AppContent() {
       case 'magazine':
         return (
           <MagazineScreen
+            isLoggedIn={isLoggedIn}
+            userName={userProfile?.name}
             onSubscribe={() => go('subscription')}
             onLogin={() => go('gateway')}
+            onProfile={() => go('profile')}
             onSettings={() => go('settings')}
-            onAbout={() => go('about')}
+            onAbout={() => go('legal', { legalTitle: 'À propos', legalUrl: 'https://santeafrique.net/a-propos', legalHideChrome: true })}
+            onLegal={() => go('mentions-legales')}
+            onPrivacy={() => go('legal', { legalTitle: 'Politique de confidentialité', legalUrl: 'https://santeafrique.net/politique-de-confidentialite', legalHideChrome: true })}
+            onConsent={() => go('legal', { legalTitle: 'Consentements', legalUrl: 'https://santeafrique.net/consentements', legalHideChrome: true })}
             onIssuePress={(issue) => go('magazine-issue', { issue })}
           />
         );
