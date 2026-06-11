@@ -1153,8 +1153,9 @@ const SmallAdBanner: React.FC = () => {
 
 // ─── Section vidéos YouTube ───────────────────────────────────────
 
-const VIDEO_CARD_W = 200;
-const VIDEO_CARD_H = 112;
+// 2 cartes visibles + ~28px d'aperçu de la 3ème
+const VIDEO_CARD_W = Math.floor((W - Spacing["4"] - Spacing["3"] - 28) / 2);
+const VIDEO_CARD_H = Math.floor(VIDEO_CARD_W * (9 / 16));
 const PLAYER_H = (W - Spacing["4"] * 2) * (9 / 16);
 
 const VideoSection: React.FC<{ videos: ApiVideo[] }> = ({ videos }) => {
