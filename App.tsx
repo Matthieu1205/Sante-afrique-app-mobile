@@ -329,6 +329,7 @@ function AppContent() {
         return (
           <MagazineScreen
             isLoggedIn={isLoggedIn}
+            isSubscribed={userProfile?.subscription?.is_active ?? false}
             userName={userProfile?.name}
             onSubscribe={() => go('subscription')}
             onLogin={() => go('gateway')}

@@ -72,6 +72,7 @@ interface MagazineScreenProps {
   onLogin?: () => void;
   onProfile?: () => void;
   isLoggedIn?: boolean;
+  isSubscribed?: boolean;
   userName?: string;
   onSettings?: () => void;
   onAbout?: () => void;
@@ -526,7 +527,25 @@ const makeStyles = (C: ThemeColors) =>
       marginTop: Spacing["2"],
     },
 
-    // Onglet Mes éditions vide
+    // Onglet Mes éditions
+    mineHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing['2'],
+      backgroundColor: C.primaryUltraLight,
+      borderRadius: Radius.sm,
+      paddingHorizontal: Spacing['3'],
+      paddingVertical: Spacing['3'],
+      marginBottom: Spacing['3'],
+      borderWidth: 1,
+      borderColor: C.primaryLight,
+    },
+    mineHeaderText: {
+      fontFamily: FontFamily.body,
+      fontSize: FontSize.sm,
+      color: C.primaryDark,
+      flex: 1,
+    },
     emptyMine: {
       flex: 1,
       alignItems: "center",
@@ -596,6 +615,7 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
   onLogin,
   onProfile,
   isLoggedIn = false,
+  isSubscribed = false,
   userName,
   onSettings,
   onAbout,
@@ -706,12 +726,48 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
             }
           />
         )
+      ) : isLoggedIn && isSubscribed ? (
+        <FlatList
+          key="mine-2cols"
+          data={issues}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <IssueCard issue={item} onPress={() => onIssuePress?.(item)} />
+          )}
+          ListHeaderComponent={
+            <View style={styles.mineHeader}>
+              <Feather name="check-circle" size={16} color={colors.primary} />
+              <Text style={styles.mineHeaderText}>
+                Toutes les éditions incluses dans votre abonnement
+              </Text>
+            </View>
+          }
+        />
+      ) : !isLoggedIn ? (
+        <View style={styles.emptyMine}>
+          <Feather name="user" size={52} color={colors.textMuted} />
+          <Text style={styles.emptyTitle}>Connectez-vous</Text>
+          <Text style={styles.emptySub}>
+            Accédez à vos éditions en vous connectant à votre compte.
+          </Text>
+          <TouchableOpacity
+            style={styles.subBtn}
+            onPress={onLogin}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.subBtnText}>Se connecter</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <View style={styles.emptyMine}>
           <Feather name="book-open" size={52} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>Aucune édition téléchargée</Text>
+          <Text style={styles.emptyTitle}>Aucune édition disponible</Text>
           <Text style={styles.emptySub}>
-            Abonnez-vous pour accéder à toutes les éditions.
+            Abonnez-vous pour accéder à toutes les éditions du magazine.
           </Text>
           <TouchableOpacity
             style={styles.subBtn}
