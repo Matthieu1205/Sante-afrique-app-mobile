@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "468469012715",
+    "project_id": "sante-afrique-5b069",
+    "storage_bucket": "sante-afrique-5b069.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:468469012715:android:6083abe67b0d84a82e86ae",
+        "android_client_info": {
+          "package_name": "net.santeafrique.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCj-xJjePRbr1KnsizkgfQbD2zAGUK5c38"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

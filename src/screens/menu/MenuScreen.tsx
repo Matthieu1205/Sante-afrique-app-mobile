@@ -31,6 +31,7 @@ interface MenuScreenProps {
   onAboutPress?: () => void;
   onLogout?: () => void;
   onLegalPress?: () => void;
+  onProfilePress?: () => void;
   userName?: string;
   subscriptionLabel?: string;
 }
@@ -109,16 +110,17 @@ const MenuRow: React.FC<{
   onPress?: () => void;
   chevron?: boolean;
   badge?: string;
-}> = ({ icon, label, sublabel, onPress, chevron = true, badge }) => {
+  labelColor?: string;
+}> = ({ icon, label, sublabel, onPress, chevron = true, badge, labelColor }) => {
   const { colors } = useTheme();
   const rowStyle = makeRowStyle(colors);
   return (
     <TouchableOpacity style={rowStyle.row} onPress={onPress} activeOpacity={0.7}>
       <View style={rowStyle.iconWrapper}>
-        <Feather name={icon} size={18} color={colors.textSecondary} />
+        <Feather name={icon} size={18} color={labelColor ?? colors.textSecondary} />
       </View>
       <View style={rowStyle.textBlock}>
-        <Text style={rowStyle.label}>{label}</Text>
+        <Text style={[rowStyle.label, labelColor ? { color: labelColor, fontFamily: FontFamily.headingBold } : null]}>{label}</Text>
         {sublabel && <Text style={rowStyle.sublabel}>{sublabel}</Text>}
       </View>
       <View style={rowStyle.right}>
@@ -146,6 +148,29 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
   shortcutBtn: { flex: 1, alignItems: 'center', gap: Spacing['2'] },
   shortcutIcon: { width: 48, height: 48, borderRadius: Radius.md, backgroundColor: C.background, alignItems: 'center', justifyContent: 'center' },
   shortcutLabel: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textSecondary, textAlign: 'center' },
+
+  // Avatar connecté
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: C.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.base,
+    color: C.white,
+    letterSpacing: 0.5,
+  },
+  avatarName: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: FontSize.xs,
+    color: C.primary,
+    textAlign: 'center',
+    maxWidth: 70,
+  },
   subscribeBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -191,6 +216,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
   onAboutPress,
   onLogout,
   onLegalPress,
+  onProfilePress,
   userName,
   subscriptionLabel,
 }) => {
@@ -205,24 +231,42 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
       <ScrollView showsVerticalScrollIndicator={false}>
 
         <View style={styles.shortcuts}>
-          {SHORTCUTS.map((s) => (
-            <TouchableOpacity
-              key={s.id}
-              style={styles.shortcutBtn}
-              onPress={
-                s.id === 'login' ? onLogin
-                : s.id === 'rubriques' ? onRubriquesPress
-                : s.id === 'alerts' ? onNotificationPress
-                : onSettingsPress
-              }
-              activeOpacity={0.75}
-            >
-              <View style={styles.shortcutIcon}>
-                <Feather name={s.icon} size={22} color={colors.textSecondary} />
-              </View>
-              <Text style={styles.shortcutLabel}>{s.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {SHORTCUTS.map((s) => {
+            const isAccount = s.id === 'login';
+            const showAvatar = isAccount && isLoggedIn && userName;
+            const initials = userName
+              ? userName.split(' ').map((w) => w[0] ?? '').slice(0, 2).join('').toUpperCase()
+              : '';
+            const firstName = userName?.split(' ')[0] ?? 'Mon compte';
+
+            return (
+              <TouchableOpacity
+                key={s.id}
+                style={styles.shortcutBtn}
+                onPress={
+                  isAccount
+                    ? (isLoggedIn ? onProfilePress : onLogin)
+                    : s.id === 'rubriques' ? onRubriquesPress
+                    : s.id === 'alerts' ? onNotificationPress
+                    : onSettingsPress
+                }
+                activeOpacity={0.75}
+              >
+                {showAvatar ? (
+                  <View style={styles.avatarCircle}>
+                    <Text style={styles.avatarInitials}>{initials}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.shortcutIcon}>
+                    <Feather name={s.icon} size={22} color={colors.textSecondary} />
+                  </View>
+                )}
+                <Text style={showAvatar ? styles.avatarName : styles.shortcutLabel} numberOfLines={1}>
+                  {showAvatar ? firstName : s.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {!isLoggedIn && (
@@ -262,7 +306,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
             </>
           ) : (
             <>
-              <MenuRow icon="user" label="Se connecter" onPress={onLogin} />
+              <MenuRow icon="user" label="Se connecter" onPress={onLogin} labelColor="#E53E3E" />
               <MenuRow icon="star" label="S'abonner" sublabel="À partir de 1 250 FCFA/mois" onPress={onSubscribe} badge="Nouveau" />
             </>
           )}
@@ -276,7 +320,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
           <MenuRow icon="info" label="À propos" onPress={onAboutPress} />
           <MenuRow icon="file-text" label="Mentions légales" onPress={onLegalPress} />
           {isLoggedIn && (
-            <MenuRow icon="log-out" label="Se déconnecter" chevron={false} onPress={onLogout} />
+            <MenuRow icon="log-out" label="Se déconnecter" chevron={false} onPress={onLogout} labelColor="#E53E3E" />
           )}
         </View>
 

@@ -2,8 +2,7 @@ import { submitCV } from '@/services/api';
 import React, { useState } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, ScrollView,
-  TextInput, StyleSheet, StatusBar, KeyboardAvoidingView,
-  Platform, Alert,
+  TextInput, StyleSheet, StatusBar, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -12,50 +11,52 @@ import { FontFamily, FontSize, Spacing, Radius } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
 
-// ─── Données de sélection ─────────────────────────────────────────────────────
+// ─── Options ─────────────────────────────────────────────────────
 
-const PAYS_AFRIQUE = [
+const PAYS_OPTIONS = [
   "Côte d'Ivoire", 'Sénégal', 'Cameroun', 'Mali', 'Burkina Faso',
   'Ghana', 'Nigeria', 'Kenya', 'Maroc', 'Tunisie', 'Algérie',
   'Guinée', 'Togo', 'Bénin', 'Niger', 'Congo', 'Gabon',
-  'Madagascar', 'Rwanda', 'Autre',
+  'Madagascar', 'Rwanda', 'RD Congo', 'Autre',
 ];
 
 const PROFESSIONS = [
   'Médecin généraliste', 'Médecin spécialiste', 'Pharmacien(ne)',
   'Sage-femme', 'Infirmier(e)', 'Aide-soignant(e)',
-  'Journaliste santé', 'Nutritionniste', 'Épidémiologiste',
-  'Chercheur médical', 'Animateur santé', 'Agent de santé communautaire',
-  'Gestionnaire de santé', 'Autre',
+  'Chirurgien(ne)-dentiste', 'Biologiste médical', 'Kinésithérapeute',
+  'Nutritionniste', 'Épidémiologiste', 'Technicien de laboratoire',
+  'Journaliste santé', 'Agent de santé communautaire',
+  'Manager / Administrateur santé', 'Chargé(e) de communication santé',
+  'Chercheur médical', 'Autre',
 ];
 
-const CONTRATS = ['Stage', 'CDD', 'CDI', 'Freelance'];
+const CONTRATS     = ['—', 'Stage', 'CDD', 'CDI', 'Freelance'];
 const DISPONIBILITES = ['Immédiate', '1 mois', '3 mois', '6 mois'];
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────
+
+const BLUE = '#1B9DD9';
+const RED  = '#EF4444';
 
 const makeStyles = (C: ThemeColors) => StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: C.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: C.backgroundCard,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
     maxHeight: '95%',
   },
   handle: {
     width: 36, height: 4, borderRadius: 2,
     backgroundColor: C.borderLight,
     alignSelf: 'center',
-    marginTop: Spacing['3'], marginBottom: Spacing['1'],
+    marginTop: Spacing['3'], marginBottom: Spacing['2'],
   },
-  sheetHeader: {
+  header: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'],
-    backgroundColor: C.backgroundCard,
+    paddingHorizontal: Spacing['4'], paddingBottom: Spacing['3'],
     borderBottomWidth: 1, borderBottomColor: C.borderLight,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
   },
-  sheetHeaderTitle: {
+  headerTitle: {
     flex: 1, fontFamily: FontFamily.headingBold,
     fontSize: FontSize.lg, color: C.textPrimary,
   },
@@ -64,218 +65,170 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     backgroundColor: C.background,
     alignItems: 'center', justifyContent: 'center',
   },
-  scroll: { paddingHorizontal: Spacing['4'] },
 
-  // Badge + intro
-  badge: {
-    alignSelf: 'flex-start',
-    backgroundColor: C.primaryUltraLight,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing['3'],
-    paddingVertical: 4,
-    marginTop: Spacing['4'],
-    marginBottom: Spacing['2'],
-  },
-  badgeText: {
-    fontFamily: FontFamily.bodySemiBold,
-    fontSize: FontSize.xs,
-    color: C.primary,
-  },
-  pageTitle: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: 22,
-    color: C.textPrimary,
-    marginBottom: Spacing['2'],
-  },
-  pageSubtitle: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: C.textSecondary,
-    lineHeight: 20,
-    marginBottom: Spacing['4'],
-  },
-  pageSubtitleBold: { fontFamily: FontFamily.bodyBold, color: C.primary },
+  content: { padding: Spacing['4'], paddingBottom: Spacing['6'] },
 
   // Section
   sectionCard: {
-    backgroundColor: C.backgroundCard,
+    borderWidth: 1, borderColor: C.borderLight,
     borderRadius: Radius.lg,
-    padding: Spacing['4'],
-    borderWidth: 1,
-    borderColor: C.borderLight,
     marginBottom: Spacing['4'],
+    overflow: 'hidden',
   },
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: Spacing['3'],
+    paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'],
+    borderBottomWidth: 1, borderBottomColor: C.borderLight,
+    backgroundColor: C.background,
+  },
+  stepBadge: {
+    width: 28, height: 28, borderRadius: 6,
+    backgroundColor: BLUE,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stepNum: { fontFamily: FontFamily.headingBold, fontSize: FontSize.sm, color: '#fff' },
   sectionTitle: {
-    fontFamily: FontFamily.headingBold,
-    fontSize: FontSize.base,
-    color: C.textPrimary,
-    marginBottom: 2,
+    fontFamily: FontFamily.headingBold, fontSize: FontSize.base, color: C.textPrimary,
   },
-  sectionNote: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: C.textMuted,
-    marginBottom: Spacing['4'],
+  sectionSub: {
+    fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textMuted,
   },
-  requiredStar: { color: '#EF4444' },
+  sectionBody: { padding: Spacing['4'], gap: Spacing['3'] },
 
   // Champs
-  row: { flexDirection: 'row', gap: Spacing['3'] },
-  fieldWrap: { flex: 1, marginBottom: Spacing['3'] },
-  fieldWrapFull: { marginBottom: Spacing['3'] },
+  field: { gap: Spacing['1'] },
+  row2: { flexDirection: 'row', gap: Spacing['3'] },
+  flex1: { flex: 1 },
+
   label: {
     fontFamily: FontFamily.bodySemiBold,
-    fontSize: FontSize.sm,
-    color: C.textSecondary,
-    marginBottom: Spacing['1'],
+    fontSize: 10, color: C.textMuted,
+    textTransform: 'uppercase', letterSpacing: 0.6,
   },
+  required: { color: RED },
+
   input: {
-    backgroundColor: C.background,
-    borderWidth: 1,
-    borderColor: C.borderLight,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing['3'],
-    paddingVertical: 10,
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
+    backgroundColor: C.background, borderWidth: 1,
+    borderColor: C.borderLight, borderRadius: Radius.md,
+    paddingHorizontal: Spacing['3'], paddingVertical: 11,
+    fontFamily: FontFamily.body, fontSize: FontSize.sm,
     color: C.textPrimary,
   },
-  inputFocused: { borderColor: '#1B9DD9' },
-  inputDisabled: { backgroundColor: C.background, color: C.textDisabled },
+  inputFocused: { borderColor: BLUE },
 
-  // Chips picker
-  pickerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.background,
-    borderWidth: 1,
-    borderColor: C.borderLight,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing['3'],
-    paddingVertical: 10,
-    justifyContent: 'space-between',
+  // Select
+  selectBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: C.background, borderWidth: 1,
+    borderColor: C.borderLight, borderRadius: Radius.md,
+    paddingHorizontal: Spacing['3'], paddingVertical: 11,
   },
-  pickerBtnText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base,
-    color: C.textDisabled,
-    flex: 1,
+  selectBtnActive: { borderColor: BLUE },
+  selectBtnText: {
+    fontFamily: FontFamily.body, fontSize: FontSize.sm,
+    color: C.textDisabled, flex: 1,
   },
-  pickerBtnTextSelected: { color: C.textPrimary },
+  selectBtnTextActive: { color: C.textPrimary },
 
-  // Chips inline
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing['2'], marginTop: Spacing['1'] },
-  chip: {
-    paddingHorizontal: Spacing['3'], paddingVertical: 6,
-    borderRadius: Radius.full, borderWidth: 1,
-    borderColor: C.borderLight, backgroundColor: C.background,
-  },
-  chipActive: { backgroundColor: '#1B9DD9', borderColor: '#1B9DD9' },
-  chipText: { fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm, color: C.textSecondary },
-  chipTextActive: { color: '#FFFFFF' },
-
-  // Upload CV
-  uploadZone: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: C.borderLight,
-    borderStyle: 'dashed',
-    borderRadius: Radius.md,
-    padding: Spacing['4'],
-    backgroundColor: C.background,
-    gap: Spacing['3'],
-    marginBottom: Spacing['2'],
-  },
-  uploadZoneSelected: { borderColor: '#1B9DD9', backgroundColor: C.primaryUltraLight },
-  uploadTextWrap: { flex: 1 },
-  uploadTitle: {
-    fontFamily: FontFamily.bodyBold,
-    fontSize: FontSize.base,
-    color: C.textPrimary,
-    marginBottom: 2,
-  },
-  uploadSub: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: C.textMuted,
-  },
-  uploadSubSelected: { color: '#1B9DD9' },
-  uploadFormats: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: '#059669',
-    marginTop: 2,
-  },
-  uploadBtn: {
-    backgroundColor: '#1B9DD9',
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing['3'],
-    paddingVertical: Spacing['2'],
-  },
-  uploadBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.sm, color: '#FFFFFF' },
-  uploadNote: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: C.textMuted,
-    marginBottom: Spacing['2'],
-  },
-
-  // Actions
-  actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing['4'],
-    marginTop: Spacing['2'],
-    marginBottom: Spacing['6'],
-  },
-  submitBtn: {
-    backgroundColor: '#1B9DD9',
-    borderRadius: Radius.md,
-    paddingVertical: Spacing['3'],
-    paddingHorizontal: Spacing['5'],
-  },
-  submitBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: '#FFFFFF' },
-  backLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  backLinkText: {
-    fontFamily: FontFamily.bodySemiBold,
-    fontSize: FontSize.base,
-    color: C.textSecondary,
-  },
-
-  // Mini picker modal
-  pickerModal: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
+  // Picker sheet
+  pickerOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end',
   },
   pickerSheet: {
     backgroundColor: C.backgroundCard,
     borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    maxHeight: '65%',
+    maxHeight: '60%',
   },
-  pickerSheetHeader: {
+  pickerHead: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'],
     borderBottomWidth: 1, borderBottomColor: C.borderLight,
   },
-  pickerSheetTitle: {
+  pickerTitle: {
     flex: 1, fontFamily: FontFamily.headingBold,
     fontSize: FontSize.base, color: C.textPrimary,
   },
-  pickerOption: {
-    paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'],
+  pickerOpt: {
+    paddingHorizontal: Spacing['4'], paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: C.borderLight,
   },
-  pickerOptionSelected: { backgroundColor: C.primaryUltraLight },
-  pickerOptionText: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.base, color: C.textPrimary,
+  pickerOptActive: { backgroundColor: C.primaryUltraLight },
+  pickerOptText: {
+    fontFamily: FontFamily.body, fontSize: FontSize.base, color: C.textPrimary,
   },
-  pickerOptionTextSelected: { color: C.primary, fontFamily: FontFamily.bodySemiBold },
+  pickerOptTextActive: { color: BLUE, fontFamily: FontFamily.bodySemiBold },
+
+  // Zone dépôt CV
+  uploadZone: {
+    borderWidth: 1.5, borderColor: C.borderLight,
+    borderStyle: 'dashed', borderRadius: Radius.md,
+    paddingVertical: Spacing['6'], paddingHorizontal: Spacing['4'],
+    alignItems: 'center', gap: Spacing['2'],
+    backgroundColor: C.background,
+  },
+  uploadZoneActive: { borderColor: BLUE, backgroundColor: C.primaryUltraLight },
+  uploadIconWrap: {
+    width: 48, height: 48, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: C.borderLight,
+    backgroundColor: C.backgroundCard,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: Spacing['1'],
+  },
+  uploadTitle: {
+    fontFamily: FontFamily.headingBold, fontSize: FontSize.base,
+    color: C.textPrimary, textAlign: 'center',
+  },
+  uploadLink: {
+    fontFamily: FontFamily.body, fontSize: FontSize.sm,
+    color: BLUE, textDecorationLine: 'underline',
+  },
+  uploadFormats: {
+    fontFamily: FontFamily.body, fontSize: FontSize.xs,
+    color: C.textMuted, textAlign: 'center',
+  },
+  uploadNote: {
+    fontFamily: FontFamily.body, fontSize: FontSize.xs,
+    color: C.textMuted, marginTop: Spacing['2'],
+  },
+  uploadFileName: {
+    fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm,
+    color: BLUE, textAlign: 'center',
+  },
+
+  // Erreur
+  errorBox: {
+    backgroundColor: '#FEF2F2', borderRadius: Radius.md,
+    borderWidth: 1, borderColor: '#FECACA',
+    padding: Spacing['3'], marginBottom: Spacing['3'],
+  },
+  errorText: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: RED },
+
+  // Footer
+  footer: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', paddingTop: Spacing['4'],
+  },
+  cancelBtn: { paddingVertical: 10, paddingHorizontal: Spacing['2'] },
+  cancelText: {
+    fontFamily: FontFamily.bodySemiBold, fontSize: FontSize.sm, color: C.textMuted,
+  },
+  submitBtn: {
+    flex: 1, marginLeft: Spacing['4'],
+    backgroundColor: '#0D2137',
+    borderRadius: Radius.md, paddingVertical: 14,
+    alignItems: 'center',
+  },
+  submitBtnDisabled: { opacity: 0.6 },
+  submitBtnText: {
+    fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: '#fff',
+    letterSpacing: 0.3,
+  },
 
   // Succès
-  successWrap: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: Spacing['4'] },
+  successWrap: {
+    alignItems: 'center', paddingVertical: 56, paddingHorizontal: Spacing['4'],
+  },
   successIcon: {
     width: 72, height: 72, borderRadius: 36,
     backgroundColor: '#D1FAE5',
@@ -283,66 +236,76 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     marginBottom: Spacing['4'],
   },
   successTitle: {
-    fontFamily: FontFamily.headingBold, fontSize: FontSize.lg,
+    fontFamily: FontFamily.headingBold, fontSize: FontSize.xl,
     color: C.textPrimary, textAlign: 'center', marginBottom: Spacing['2'],
   },
   successSub: {
     fontFamily: FontFamily.body, fontSize: FontSize.base,
-    color: C.textMuted, textAlign: 'center', lineHeight: 22,
+    color: C.textMuted, textAlign: 'center', lineHeight: 24,
   },
   doneBtn: {
-    backgroundColor: '#1B9DD9', borderRadius: Radius.md,
-    paddingVertical: Spacing['4'], paddingHorizontal: Spacing['8'],
+    backgroundColor: BLUE, borderRadius: Radius.md,
+    paddingVertical: 14, paddingHorizontal: Spacing['8'],
     marginTop: Spacing['5'],
   },
-  doneBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: '#FFFFFF' },
+  doneBtnText: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: '#fff' },
 });
 
-// ─── Mini Picker Modal ────────────────────────────────────────────────────────
+// ─── Picker générique ─────────────────────────────────────────────
 
-interface PickerModalProps {
-  visible: boolean;
-  title: string;
+const SheetPicker: React.FC<{
+  label: string;
   options: string[];
-  selected: string;
-  onSelect: (v: string) => void;
-  onClose: () => void;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
   styles: ReturnType<typeof makeStyles>;
   colors: ThemeColors;
-}
+}> = ({ label, options, value, onChange, placeholder = 'Sélectionner...', styles, colors }) => {
+  const [open, setOpen] = useState(false);
+  const hasValue = !!value && value !== '—';
+  return (
+    <>
+      <TouchableOpacity
+        style={[styles.selectBtn, hasValue && styles.selectBtnActive]}
+        onPress={() => setOpen(true)} activeOpacity={0.8}
+      >
+        <Text style={[styles.selectBtnText, hasValue && styles.selectBtnTextActive]} numberOfLines={1}>
+          {value || placeholder}
+        </Text>
+        <Feather name="chevron-down" size={14} color={colors.textMuted} />
+      </TouchableOpacity>
 
-const PickerModal: React.FC<PickerModalProps> = ({
-  visible, title, options, selected, onSelect, onClose, styles, colors,
-}) => (
-  <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-    <View style={styles.pickerModal}>
-      <View style={styles.pickerSheet}>
-        <View style={styles.pickerSheetHeader}>
-          <Text style={styles.pickerSheetTitle}>{title}</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Feather name="x" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-        <ScrollView>
-          {options.map((opt) => (
-            <TouchableOpacity
-              key={opt}
-              style={[styles.pickerOption, selected === opt && styles.pickerOptionSelected]}
-              onPress={() => { onSelect(opt); onClose(); }}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.pickerOptionText, selected === opt && styles.pickerOptionTextSelected]}>
-                {opt}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    </View>
-  </Modal>
-);
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setOpen(false)}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHead}>
+              <Text style={styles.pickerTitle}>{label}</Text>
+              <TouchableOpacity onPress={() => setOpen(false)}>
+                <Feather name="x" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {options.map((opt) => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.pickerOpt, value === opt && styles.pickerOptActive]}
+                  onPress={() => { onChange(opt); setOpen(false); }}
+                >
+                  <Text style={[styles.pickerOptText, value === opt && styles.pickerOptTextActive]}>
+                    {opt}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
+  );
+};
 
-// ─── Composant principal ──────────────────────────────────────────────────────
+// ─── Modal principal ──────────────────────────────────────────────
 
 interface Props { visible: boolean; onClose: () => void; }
 
@@ -351,27 +314,39 @@ export const SubmitCVModal: React.FC<Props> = ({ visible, onClose }) => {
   const styles = makeStyles(colors);
   const insets = useSafeAreaInsets();
 
-  // État formulaire
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted]     = useState(false);
+  const [loading, setLoading]         = useState(false);
   const [serverError, setServerError] = useState('');
-  const [focused, setFocused] = useState('');
-  const [prenom, setPrenom] = useState('');
-  const [nom, setNom] = useState('');
-  const [email, setEmail] = useState('');
-  const [telephone, setTelephone] = useState('');
-  const [pays, setPays] = useState('');
-  const [ville, setVille] = useState('');
-  const [profession, setProfession] = useState('');
-  const [experience, setExperience] = useState('');
-  const [competences, setCompetences] = useState('');
-  const [contrat, setContrat] = useState('');
+  const [focused, setFocused]         = useState('');
+
+  // Section 1
+  const [prenom, setPrenom]         = useState('');
+  const [nom, setNom]               = useState('');
+  const [email, setEmail]           = useState('');
+  const [telephone, setTelephone]   = useState('');
+  const [pays, setPays]             = useState('');
+  const [ville, setVille]           = useState('');
+
+  // Section 2
+  const [profession, setProfession]     = useState('');
+  const [experience, setExperience]     = useState('');
+  const [competences, setCompetences]   = useState('');
+  const [contrat, setContrat]           = useState('—');
   const [disponibilite, setDisponibilite] = useState('Immédiate');
+
+  // Section 3
   const [cvFile, setCvFile] = useState<{ uri: string; name: string } | null>(null);
 
-  // Pickers visibilité
-  const [showPays, setShowPays] = useState(false);
-  const [showProfession, setShowProfession] = useState(false);
+  const reset = () => {
+    setSubmitted(false); setServerError('');
+    setPrenom(''); setNom(''); setEmail(''); setTelephone('');
+    setPays(''); setVille('');
+    setProfession(''); setExperience(''); setCompetences('');
+    setContrat('—'); setDisponibilite('Immédiate');
+    setCvFile(null);
+  };
+
+  const handleClose = () => { reset(); onClose(); };
 
   const handlePickCV = async () => {
     try {
@@ -384,287 +359,258 @@ export const SubmitCVModal: React.FC<Props> = ({ visible, onClose }) => {
         const asset = result.assets[0];
         setCvFile({ uri: asset.uri, name: asset.name });
       }
-    } catch {
-      Alert.alert('Erreur', 'Impossible d\'ouvrir le sélecteur de fichier.');
-    }
+    } catch {}
   };
 
   const handleSubmit = async () => {
-    if (!prenom || !nom || !email || !profession) {
-      setServerError('Veuillez renseigner votre prénom, nom, email et profession.');
-      return;
-    }
-    setLoading(true);
-    setServerError('');
+    if (!prenom.trim()) { setServerError('Le prénom est obligatoire.'); return; }
+    if (!nom.trim())    { setServerError('Le nom est obligatoire.'); return; }
+    if (!email.trim())  { setServerError('L\'adresse email est obligatoire.'); return; }
+    if (!pays)          { setServerError('Le pays de résidence est obligatoire.'); return; }
+    if (!profession)    { setServerError('La profession est obligatoire.'); return; }
+
+    setLoading(true); setServerError('');
     const result = await submitCV({
-      first_name: prenom, last_name: nom, email,
-      phone: telephone, country: pays, city: ville,
-      profession, experience, skills: competences,
-      contract: contrat, availability: disponibilite,
-      cv_uri: cvFile?.uri ?? null, cv_name: cvFile?.name ?? null,
+      first_name: prenom.trim(), last_name: nom.trim(),
+      email: email.trim(), phone: telephone || undefined,
+      country: pays, city: ville || undefined,
+      profession,
+      experience: experience || undefined,
+      skills: competences || undefined,
+      contract: contrat !== '—' ? contrat : undefined,
+      availability: disponibilite,
+      cv_uri: cvFile?.uri ?? null,
+      cv_name: cvFile?.name ?? null,
     });
     setLoading(false);
-    if (result.ok) {
-      setSubmitted(true);
-    } else {
-      setServerError(result.message);
-    }
+    if (result.ok) { setSubmitted(true); } else { setServerError(result.message); }
   };
 
-  const handleClose = () => {
-    setSubmitted(false);
-    setPrenom(''); setNom(''); setEmail(''); setTelephone('');
-    setPays(''); setVille(''); setProfession(''); setExperience('');
-    setCompetences(''); setContrat(''); setDisponibilite('Immédiate');
-    setCvFile(null);
-    onClose();
-  };
-
-  const InputField = ({
-    label, value, onChange, placeholder, keyboard = 'default', field = '',
-  }: {
-    label: string; value: string; onChange: (v: string) => void;
-    placeholder?: string; keyboard?: any; field?: string;
-  }) => (
-    <>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={[styles.input, focused === field && styles.inputFocused]}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textDisabled}
-        value={value}
-        onChangeText={onChange}
-        keyboardType={keyboard}
-        autoCapitalize={keyboard === 'email-address' ? 'none' : 'sentences'}
-        onFocus={() => setFocused(field)}
-        onBlur={() => setFocused('')}
-      />
-    </>
-  );
+  const f = (name: string) => ({ onFocus: () => setFocused(name), onBlur: () => setFocused('') });
+  const inp = (name: string) => [styles.input, focused === name && styles.inputFocused];
 
   return (
-    <>
-      {/* Pickers imbriqués */}
-      <PickerModal
-        visible={showPays} title="Sélectionnez votre pays"
-        options={PAYS_AFRIQUE} selected={pays}
-        onSelect={setPays} onClose={() => setShowPays(false)}
-        styles={styles} colors={colors}
-      />
-      <PickerModal
-        visible={showProfession} title="Sélectionnez votre profession"
-        options={PROFESSIONS} selected={profession}
-        onSelect={setProfession} onClose={() => setShowProfession(false)}
-        styles={styles} colors={colors}
-      />
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={handleClose}>
+      <StatusBar barStyle="dark-content" backgroundColor="rgba(0,0,0,0.55)" />
+      <View style={styles.overlay}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 0 }}>
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + Spacing['2'] }]}>
+            <View style={styles.handle} />
 
-      <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={handleClose}>
-        <StatusBar barStyle="dark-content" backgroundColor="rgba(0,0,0,0.55)" />
-        <View style={styles.overlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 0 }}>
-            <View style={[styles.sheet, { paddingBottom: insets.bottom + Spacing['2'] }]}>
-              <View style={styles.handle} />
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetHeaderTitle}>Déposer mon CV</Text>
-                <TouchableOpacity style={styles.closeBtn} onPress={handleClose}>
-                  <Feather name="x" size={18} color={colors.textSecondary} />
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Rejoindre la CVthèque</Text>
+              <TouchableOpacity style={styles.closeBtn} onPress={handleClose}>
+                <Feather name="x" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {submitted ? (
+              <View style={styles.successWrap}>
+                <View style={styles.successIcon}>
+                  <Feather name="check" size={36} color="#059669" />
+                </View>
+                <Text style={styles.successTitle}>Profil enregistré !</Text>
+                <Text style={styles.successSub}>
+                  Votre CV a été déposé sur Santé Afrique.{'\n'}
+                  Les recruteurs abonnés pourront consulter votre profil.
+                </Text>
+                <TouchableOpacity style={styles.doneBtn} onPress={handleClose}>
+                  <Text style={styles.doneBtnText}>Fermer</Text>
                 </TouchableOpacity>
               </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <View style={styles.content}>
 
-              {submitted ? (
-                <View style={styles.successWrap}>
-                  <View style={styles.successIcon}>
-                    <Feather name="check" size={36} color="#059669" />
-                  </View>
-                  <Text style={styles.successTitle}>Profil enregistré !</Text>
-                  <Text style={styles.successSub}>
-                    Votre CV a été déposé sur Santé Afrique.{'\n'}
-                    Les recruteurs abonnés pourront consulter votre profil.
-                  </Text>
-                  <TouchableOpacity style={styles.doneBtn} onPress={handleClose}>
-                    <Text style={styles.doneBtnText}>Fermer</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <ScrollView
-                  style={styles.scroll}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {/* Intro */}
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>Espace candidats</Text>
-                  </View>
-                  <Text style={styles.pageTitle}>Déposer mon CV</Text>
-                  <Text style={styles.pageSubtitle}>
-                    Créez votre profil en quelques minutes. Les recruteurs abonnés à{' '}
-                    <Text style={styles.pageSubtitleBold}>Santé Afrique</Text>
-                    {' '}pourront vous trouver par métier, pays, expérience et compétences clés.
-                  </Text>
-
-                  {/* ── Informations personnelles ── */}
+                  {/* ── Section 1 : Informations personnelles ── */}
                   <View style={styles.sectionCard}>
-                    <Text style={styles.sectionTitle}>Informations personnelles</Text>
-                    <Text style={styles.sectionNote}>
-                      Les champs marqués d'un <Text style={styles.requiredStar}>*</Text> sont obligatoires.
-                    </Text>
-
-                    <View style={styles.row}>
-                      <View style={styles.fieldWrap}>
-                        <InputField label="Prénom *" value={prenom} onChange={setPrenom} placeholder="Votre prénom" field="prenom" />
-                      </View>
-                      <View style={styles.fieldWrap}>
-                        <InputField label="Nom *" value={nom} onChange={setNom} placeholder="Votre nom" field="nom" />
+                    <View style={styles.sectionHeader}>
+                      <View style={styles.stepBadge}><Text style={styles.stepNum}>1</Text></View>
+                      <View>
+                        <Text style={styles.sectionTitle}>Informations personnelles</Text>
+                        <Text style={styles.sectionSub}>Les champs marqués * sont obligatoires.</Text>
                       </View>
                     </View>
+                    <View style={styles.sectionBody}>
 
-                    <View style={styles.row}>
-                      <View style={styles.fieldWrap}>
-                        <InputField label="E-mail *" value={email} onChange={setEmail} placeholder="vous@exemple.com" keyboard="email-address" field="email" />
-                      </View>
-                      <View style={styles.fieldWrap}>
-                        <InputField label="Téléphone" value={telephone} onChange={setTelephone} placeholder="+225..." keyboard="phone-pad" field="tel" />
-                      </View>
-                    </View>
-
-                    <View style={styles.row}>
-                      <View style={styles.fieldWrap}>
-                        <Text style={styles.label}>Pays <Text style={styles.requiredStar}>*</Text></Text>
-                        <TouchableOpacity style={styles.pickerBtn} onPress={() => setShowPays(true)} activeOpacity={0.8}>
-                          <Text style={[styles.pickerBtnText, pays && styles.pickerBtnTextSelected]}>
-                            {pays || 'Sélectionnez votre pays'}
-                          </Text>
-                          <Feather name="chevron-down" size={16} color={colors.textMuted} />
-                        </TouchableOpacity>
-                      </View>
-                      <View style={styles.fieldWrap}>
-                        <InputField label="Ville" value={ville} onChange={setVille} placeholder="Abidjan, Dakar, Cotonou..." field="ville" />
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* ── Profil professionnel ── */}
-                  <View style={styles.sectionCard}>
-                    <Text style={styles.sectionTitle}>Profil professionnel</Text>
-
-                    <View style={styles.row}>
-                      <View style={styles.fieldWrap}>
-                        <Text style={styles.label}>Profession <Text style={styles.requiredStar}>*</Text></Text>
-                        <TouchableOpacity style={styles.pickerBtn} onPress={() => setShowProfession(true)} activeOpacity={0.8}>
-                          <Text style={[styles.pickerBtnText, profession && styles.pickerBtnTextSelected]}>
-                            {profession || 'Sélectionnez votre profession'}
-                          </Text>
-                          <Feather name="chevron-down" size={16} color={colors.textMuted} />
-                        </TouchableOpacity>
-                      </View>
-                      <View style={styles.fieldWrap}>
-                        <InputField label="Expérience (années)" value={experience} onChange={setExperience} placeholder="Ex. : 3" keyboard="numeric" field="exp" />
-                      </View>
-                    </View>
-
-                    <View style={styles.fieldWrapFull}>
-                      <InputField
-                        label="Compétences clés (mots-clés)"
-                        value={competences} onChange={setCompetences}
-                        placeholder="ex: dispensation, validation d'ordonnances, Excel..."
-                        field="comp"
-                      />
-                    </View>
-
-                    <View style={styles.row}>
-                      <View style={styles.fieldWrap}>
-                        <Text style={styles.label}>Type de contrat souhaité</Text>
-                        <View style={styles.chipsRow}>
-                          {CONTRATS.map((c) => (
-                            <TouchableOpacity
-                              key={c}
-                              style={[styles.chip, contrat === c && styles.chipActive]}
-                              onPress={() => setContrat(contrat === c ? '' : c)}
-                              activeOpacity={0.75}
-                            >
-                              <Text style={[styles.chipText, contrat === c && styles.chipTextActive]}>{c}</Text>
-                            </TouchableOpacity>
-                          ))}
+                      <View style={styles.row2}>
+                        <View style={[styles.field, styles.flex1]}>
+                          <Text style={styles.label}>PRÉNOM <Text style={styles.required}>*</Text></Text>
+                          <TextInput style={inp('prenom')} placeholder="Votre prénom"
+                            placeholderTextColor={colors.textDisabled}
+                            value={prenom} onChangeText={setPrenom} {...f('prenom')} />
+                        </View>
+                        <View style={[styles.field, styles.flex1]}>
+                          <Text style={styles.label}>NOM <Text style={styles.required}>*</Text></Text>
+                          <TextInput style={inp('nom')} placeholder="Votre nom"
+                            placeholderTextColor={colors.textDisabled}
+                            value={nom} onChangeText={setNom} {...f('nom')} />
                         </View>
                       </View>
-                      <View style={styles.fieldWrap}>
-                        <Text style={styles.label}>Disponibilité</Text>
-                        <View style={styles.chipsRow}>
-                          {DISPONIBILITES.map((d) => (
-                            <TouchableOpacity
-                              key={d}
-                              style={[styles.chip, disponibilite === d && styles.chipActive]}
-                              onPress={() => setDisponibilite(d)}
-                              activeOpacity={0.75}
-                            >
-                              <Text style={[styles.chipText, disponibilite === d && styles.chipTextActive]}>{d}</Text>
-                            </TouchableOpacity>
-                          ))}
+
+                      <View style={styles.row2}>
+                        <View style={[styles.field, styles.flex1]}>
+                          <Text style={styles.label}>ADRESSE EMAIL <Text style={styles.required}>*</Text></Text>
+                          <TextInput style={inp('email')} placeholder="vous@exemple.com"
+                            placeholderTextColor={colors.textDisabled}
+                            value={email} onChangeText={setEmail}
+                            keyboardType="email-address" autoCapitalize="none" {...f('email')} />
+                        </View>
+                        <View style={[styles.field, styles.flex1]}>
+                          <Text style={styles.label}>TÉLÉPHONE</Text>
+                          <TextInput style={inp('tel')} placeholder="+225 07 00 00 00 00"
+                            placeholderTextColor={colors.textDisabled}
+                            value={telephone} onChangeText={setTelephone}
+                            keyboardType="phone-pad" {...f('tel')} />
                         </View>
                       </View>
+
+                      <View style={styles.row2}>
+                        <View style={[styles.field, styles.flex1]}>
+                          <Text style={styles.label}>PAYS DE RÉSIDENCE <Text style={styles.required}>*</Text></Text>
+                          <SheetPicker
+                            label="Pays de résidence"
+                            options={PAYS_OPTIONS} value={pays} onChange={setPays}
+                            placeholder="Sélectionnez votre pays"
+                            styles={styles} colors={colors}
+                          />
+                        </View>
+                        <View style={[styles.field, styles.flex1]}>
+                          <Text style={styles.label}>VILLE</Text>
+                          <TextInput style={inp('ville')} placeholder="Abidjan, Dakar, Cotonou..."
+                            placeholderTextColor={colors.textDisabled}
+                            value={ville} onChangeText={setVille} {...f('ville')} />
+                        </View>
+                      </View>
+
                     </View>
                   </View>
 
-                  {/* ── CV ── */}
+                  {/* ── Section 2 : Profil professionnel ── */}
                   <View style={styles.sectionCard}>
-                    <Text style={[styles.label, { marginBottom: Spacing['3'] }]}>
-                      CV <Text style={styles.requiredStar}>*</Text>
-                    </Text>
+                    <View style={styles.sectionHeader}>
+                      <View style={styles.stepBadge}><Text style={styles.stepNum}>2</Text></View>
+                      <View>
+                        <Text style={styles.sectionTitle}>Profil professionnel</Text>
+                        <Text style={styles.sectionSub}>Aide les recruteurs à vous trouver lors de leurs recherches.</Text>
+                      </View>
+                    </View>
+                    <View style={styles.sectionBody}>
 
-                    <TouchableOpacity
-                      style={[styles.uploadZone, cvFile && styles.uploadZoneSelected]}
-                      onPress={handlePickCV}
-                      activeOpacity={0.8}
-                    >
-                      <Feather name="paperclip" size={24} color={cvFile ? colors.primary : colors.textMuted} />
-                      <View style={styles.uploadTextWrap}>
-                        <Text style={styles.uploadTitle}>
-                          {cvFile != null ? String(cvFile.name) : 'Ajouter votre CV'}
-                        </Text>
-                        {!cvFile ? (
-                          <>
-                            <Text style={styles.uploadSub}>
-                              Cliquez sur "Choisir un fichier" pour sélectionner votre CV.
-                            </Text>
-                            <Text style={styles.uploadFormats}>
-                              Formats acceptés : PDF, DOC, DOCX • Taille max : 8 Mo
-                            </Text>
-                          </>
+                      <View style={styles.row2}>
+                        <View style={[styles.field, styles.flex1]}>
+                          <Text style={styles.label}>PROFESSION <Text style={styles.required}>*</Text></Text>
+                          <SheetPicker
+                            label="Profession"
+                            options={PROFESSIONS} value={profession} onChange={setProfession}
+                            placeholder="Sélectionnez votre profession"
+                            styles={styles} colors={colors}
+                          />
+                        </View>
+                        <View style={[styles.field, styles.flex1]}>
+                          <Text style={styles.label}>ANNÉES D'EXPÉRIENCE</Text>
+                          <TextInput style={inp('exp')} placeholder="Ex. : 5"
+                            placeholderTextColor={colors.textDisabled}
+                            value={experience} onChangeText={(v) => setExperience(v.replace(/\D/g, ''))}
+                            keyboardType="numeric" {...f('exp')} />
+                        </View>
+                      </View>
+
+                      <View style={styles.field}>
+                        <Text style={styles.label}>COMPÉTENCES CLÉS</Text>
+                        <TextInput style={inp('comp')} placeholder="dispensation, Excel, gestion de projet..."
+                          placeholderTextColor={colors.textDisabled}
+                          value={competences} onChangeText={setCompetences} {...f('comp')} />
+                      </View>
+
+                      <View style={styles.row2}>
+                        <View style={[styles.field, styles.flex1]}>
+                          <Text style={styles.label}>TYPE DE CONTRAT SOUHAITÉ</Text>
+                          <SheetPicker
+                            label="Type de contrat souhaité"
+                            options={CONTRATS} value={contrat} onChange={setContrat}
+                            placeholder="—"
+                            styles={styles} colors={colors}
+                          />
+                        </View>
+                        <View style={[styles.field, styles.flex1]}>
+                          <Text style={styles.label}>DISPONIBILITÉ</Text>
+                          <SheetPicker
+                            label="Disponibilité"
+                            options={DISPONIBILITES} value={disponibilite} onChange={setDisponibilite}
+                            styles={styles} colors={colors}
+                          />
+                        </View>
+                      </View>
+
+                    </View>
+                  </View>
+
+                  {/* ── Section 3 : Votre CV ── */}
+                  <View style={styles.sectionCard}>
+                    <View style={styles.sectionHeader}>
+                      <View style={styles.stepBadge}><Text style={styles.stepNum}>3</Text></View>
+                      <View>
+                        <Text style={styles.sectionTitle}>Votre CV</Text>
+                        <Text style={styles.sectionSub}>PDF, DOC ou DOCX — 8 Mo maximum.</Text>
+                      </View>
+                    </View>
+                    <View style={styles.sectionBody}>
+
+                      <TouchableOpacity
+                        style={[styles.uploadZone, cvFile && styles.uploadZoneActive]}
+                        onPress={handlePickCV} activeOpacity={0.8}
+                      >
+                        <View style={styles.uploadIconWrap}>
+                          <Feather name="upload" size={22} color={cvFile ? BLUE : colors.textMuted} />
+                        </View>
+                        {cvFile ? (
+                          <Text style={styles.uploadFileName} numberOfLines={1}>{cvFile.name}</Text>
                         ) : (
-                          <Text style={[styles.uploadSub, styles.uploadSubSelected]}>Fichier sélectionné</Text>
+                          <>
+                            <Text style={styles.uploadTitle}>Glissez votre CV ici</Text>
+                            <Text style={styles.uploadLink}>ou parcourir vos fichiers</Text>
+                          </>
                         )}
-                      </View>
-                      <TouchableOpacity style={styles.uploadBtn} onPress={handlePickCV} activeOpacity={0.85}>
-                        <Text style={styles.uploadBtnText}>
-                          {cvFile ? 'Changer' : 'Choisir un fichier'}
-                        </Text>
+                        <Text style={styles.uploadFormats}>PDF · DOC · DOCX · max 8 Mo</Text>
                       </TouchableOpacity>
-                    </TouchableOpacity>
 
-                    <Text style={styles.uploadNote}>
-                      Votre CV ne sera visible que par des recruteurs abonnés à la plateforme.
-                    </Text>
+                      <Text style={styles.uploadNote}>
+                        Votre CV ne sera visible que par des recruteurs abonnés à la plateforme.
+                      </Text>
+
+                    </View>
                   </View>
 
-                  {/* ── Actions ── */}
-                  <View style={styles.actionsRow}>
-                    {serverError ? (
-                      <Text style={{ color: '#EF4444', fontSize: 13, textAlign: 'center', marginBottom: 8 }}>{serverError}</Text>
-                    ) : null}
-                    <TouchableOpacity style={[styles.submitBtn, loading && { opacity: 0.6 }]} onPress={handleSubmit} disabled={loading} activeOpacity={0.85}>
-                      <Text style={styles.submitBtnText}>{loading ? 'Envoi en cours…' : 'Enregistrer mon profil'}</Text>
+                  {/* ── Erreur ── */}
+                  {serverError ? (
+                    <View style={styles.errorBox}>
+                      <Text style={styles.errorText}>{serverError}</Text>
+                    </View>
+                  ) : null}
+
+                  {/* ── Footer ── */}
+                  <View style={styles.footer}>
+                    <TouchableOpacity style={styles.cancelBtn} onPress={handleClose} activeOpacity={0.7}>
+                      <Text style={styles.cancelText}>← Retour</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.backLink} onPress={handleClose} activeOpacity={0.75}>
-                      <Feather name="arrow-left" size={14} color={colors.textSecondary} />
-                      <Text style={styles.backLinkText}>Retour aux offres</Text>
+                    <TouchableOpacity
+                      style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
+                      onPress={handleSubmit} disabled={loading} activeOpacity={0.85}
+                    >
+                      <Text style={styles.submitBtnText}>
+                        {loading ? 'Envoi en cours…' : 'Enregistrer mon profil →'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
-                </ScrollView>
-              )}
-            </View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
-    </>
+
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 };

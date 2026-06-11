@@ -1,12 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, AppState } from 'react-native';
 import {
   requestPushPermissions,
-  getUnreadCount,
   sendPushTokenToServer,
   setupNotificationListeners,
+  getStoredNotifications,
+  countUnread,
+  checkAndNotifySubscriptionExpiry,
+  getLastNotificationArticleId,
+  getPushToken,
 } from './src/services/notifications';
-import { fetchArticles, getAuthToken, logoutUser, fetchUserProfile } from './src/services/api';
+import { getAuthToken, logoutUser, fetchUserProfile } from './src/services/api';
 import type { UserProfile } from './src/services/api';
 import { Feather } from '@expo/vector-icons';
 
@@ -47,10 +51,15 @@ import type { MagazineIssue } from './src/screens/magazine/MagazineScreen';
 import { MagazineIssueScreen } from './src/screens/magazine/MagazineIssueScreen';
 import { AboutScreen } from './src/screens/about/AboutScreen';
 import { SubscriptionScreen } from './src/screens/subscription/SubscriptionScreen';
+import { MonAbonnementScreen } from './src/screens/subscription/MonAbonnementScreen';
 import { JobsScreen } from './src/screens/jobs/JobsScreen';
 import { PartnersScreen } from './src/screens/partners/PartnersScreen';
 import { KitMediaScreen } from './src/screens/partners/KitMediaScreen';
 import { LegalScreen } from './src/screens/legal/LegalScreen';
+import { MentionsLegalesScreen } from './src/screens/legal/MentionsLegalesScreen';
+import { ProfileScreen } from './src/screens/auth/ProfileScreen';
+import { HistoryScreen } from './src/screens/history/HistoryScreen';
+import { FacturesScreen } from './src/screens/factures/FacturesScreen';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import type { Category } from './src/components/common';
 
@@ -79,7 +88,12 @@ type Screen =
   | 'jobs'
   | 'partners'
   | 'kit-media'
-  | 'legal';
+  | 'legal'
+  | 'profile'
+  | 'history'
+  | 'factures'
+  | 'mon-abonnement'
+  | 'mentions-legales';
 
 interface NavState {
   screen: Screen;
@@ -92,6 +106,7 @@ interface NavState {
     legalTitle?: string;
     legalUrl?: string;
     legalHideChrome?: boolean;
+    legalRequiresAuth?: boolean;
   };
 }
 
@@ -180,12 +195,36 @@ function AppContent() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
   const go = (screen: Screen, params?: NavState['params']) =>
     setNav({ screen, params });
 
+  const refreshProfile = useCallback(() => {
+    getAuthToken().then((t) => {
+      if (t) fetchUserProfile().then(setUserProfile);
+    });
+  }, []);
+
+  // Vérifie l'expiration de l'abonnement à chaque chargement du profil
+  useEffect(() => {
+    if (userProfile?.subscription?.is_active && userProfile.subscription.expires_at) {
+      checkAndNotifySubscriptionExpiry(userProfile.subscription.expires_at).then((created) => {
+        if (created) {
+          // Une nouvelle notification d'expiration a été créée → met à jour le badge
+          getStoredNotifications().then((notifs) => setUnreadCount(countUnread(notifs)));
+        }
+      });
+    }
+  }, [userProfile]);
+
   const handleLogin = (dest: Screen = 'home') => {
     setIsLoggedIn(true);
+    getAuthToken().then((t) => {
+      setAuthToken(t);
+      // Re-envoie le token push avec le Bearer token pour lier au compte utilisateur
+      if (t) getPushToken().then((pt) => { if (pt) sendPushTokenToServer(pt); });
+    });
     fetchUserProfile().then(setUserProfile);
     go(dest);
   };
@@ -193,6 +232,7 @@ function AppContent() {
   const handleLogout = async () => {
     await logoutUser();
     setIsLoggedIn(false);
+    setAuthToken(null);
     setUserProfile(null);
     go('home');
   };
@@ -200,26 +240,41 @@ function AppContent() {
   useEffect(() => {
     getAuthToken().then((t) => {
       setIsLoggedIn(!!t);
+      setAuthToken(t);
       if (t) fetchUserProfile().then(setUserProfile);
     });
-    // 1. Demande permission + envoie le token au serveur Laravel
+
+    // 1. Badge initial depuis le store local
+    getStoredNotifications().then((notifs) => setUnreadCount(countUnread(notifs)));
+
+    // 2. Permission push + enregistrement du token (avec Bearer si connecté)
     requestPushPermissions().then((token) => {
       if (token) sendPushTokenToServer(token);
     });
 
-    // 2. Calcul du badge initial depuis les articles récents
-    fetchArticles(1).then((res) => {
-      const ids = (res?.data ?? []).slice(0, 20).map((a) => String(a.id));
-      getUnreadCount(ids).then(setUnreadCount);
+    // 3. Cold start : app ouverte depuis une notification système
+    getLastNotificationArticleId().then((articleId) => {
+      if (articleId) go('article-detail', { articleId, fromScreen: 'home' });
     });
 
-    // 3. Listeners push : reçue → +1 badge ; lue (tap) → -1 badge + navigation
+    // 4. Listeners push : reçue → stocke + badge +1 ; tap → badge -1 + navigation
     const cleanup = setupNotificationListeners(
       () => setUnreadCount((n) => n + 1),
       () => setUnreadCount((n) => Math.max(0, n - 1)),
       (articleId) => go('article-detail', { articleId, fromScreen: 'home' }),
+      () => go('magazine'),
     );
-    return cleanup;
+
+    // 4. Recharge le profil quand l'app revient au premier plan
+    // (cas : utilisateur s'abonne sur le site web et revient dans l'app)
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshProfile();
+    });
+
+    return () => {
+      cleanup();
+      appStateSub.remove();
+    };
   }, []);
 
   const [fontsLoaded] = useFonts({
@@ -300,6 +355,9 @@ function AppContent() {
         return (
           <ArticleDetailScreen
             articleId={params?.articleId}
+            isSubscriber={userProfile?.subscription?.is_active ?? false}
+            onSubscribePress={() => go('subscription')}
+            onLoginPress={() => go('login')}
             onBack={() => {
               const from = params?.fromScreen ?? 'home';
               if (from === 'category-detail') {
@@ -340,7 +398,10 @@ function AppContent() {
                 : undefined
             }
             onLogin={() => go('login')}
-            onSubscribe={() => go('subscription')}
+            onSubscribe={() => isLoggedIn && userProfile?.subscription?.is_active
+              ? go('mon-abonnement', { fromScreen: 'menu' })
+              : go('subscription')
+            }
             onCategoryPress={(cat, title) =>
               go('category-detail', { category: cat, categoryTitle: title })
             }
@@ -351,9 +412,11 @@ function AppContent() {
             onPartnersPress={() => go('partners')}
             onSettingsPress={() => go('settings')}
             onFavoritesPress={() => go('bookmarks')}
+            onHistoryPress={() => go('history')}
             onAboutPress={() => go('legal', { legalTitle: 'À propos', legalUrl: 'https://santeafrique.net/a-propos', legalHideChrome: true })}
             onLogout={handleLogout}
-            onLegalPress={() => go('legal', { legalTitle: 'Mentions légales', legalUrl: 'https://santeafrique.net/mentions-legales' })}
+            onLegalPress={() => go('mentions-legales')}
+            onProfilePress={() => go('profile')}
           />
         );
 
@@ -406,6 +469,7 @@ function AppContent() {
           <NotificationsScreen
             onBack={() => go(params?.fromScreen ?? 'home')}
             onArticlePress={(id) => go('article-detail', { articleId: id })}
+            onMagazinePress={() => go('magazine')}
             onUnreadChange={setUnreadCount}
           />
         );
@@ -423,9 +487,17 @@ function AppContent() {
         return params?.issue ? (
           <MagazineIssueScreen
             issue={params.issue}
+            isLoggedIn={isLoggedIn}
+            isSubscriber={userProfile?.subscription?.is_active ?? false}
             onBack={() => go('magazine')}
             onSubscribe={() => go('subscription')}
-            onLogin={() => go('login')}
+            onLogin={() => isLoggedIn ? go('profile') : go('login')}
+            onRead={(url) => go('legal', {
+              legalTitle: `Santé Afrique N°${params.issue!.number}`,
+              legalUrl: url,
+              legalHideChrome: true,
+              legalRequiresAuth: true,
+            })}
           />
         ) : null;
 
@@ -436,6 +508,10 @@ function AppContent() {
             onNotificationPress={() => go('notifications')}
             onLogin={() => go('gateway')}
             onSubscribe={() => go('subscription')}
+            onJobPress={(url, title) => go('legal', { legalTitle: title, legalUrl: url, legalHideChrome: true, fromScreen: 'jobs' })}
+            onApplyPress={(url, title) => go('legal', { legalTitle: title, legalUrl: url, legalHideChrome: true, fromScreen: 'jobs' })}
+            onViewCV={(url, title) => go('legal', { legalTitle: title, legalUrl: url, legalHideChrome: true, fromScreen: 'jobs' })}
+            isSubscribed={userProfile?.subscription?.is_active ?? false}
           />
         );
 
@@ -457,9 +533,49 @@ function AppContent() {
             title={params?.legalTitle ?? 'Mentions légales'}
             url={params?.legalUrl ?? 'https://santeafrique.net/mentions-legales'}
             hideChrome={params?.legalHideChrome}
-            onBack={() => go('menu')}
+            authToken={params?.legalRequiresAuth ? authToken : null}
+            onBack={() => go(params?.fromScreen ?? 'menu')}
           />
         );
+
+      case 'profile':
+        return userProfile ? (
+          <ProfileScreen
+            userProfile={userProfile}
+            onBack={() => go('menu')}
+            onSubscribe={() => go('mon-abonnement', { fromScreen: 'profile' })}
+            onFavoritesPress={() => go('bookmarks')}
+            onHistoryPress={() => go('history')}
+            onFacturesPress={() => go('factures')}
+            onSettingsPress={() => go('settings')}
+            onLogout={handleLogout}
+            onProfileUpdated={(name) => setUserProfile((p) => p ? { ...p, name } : p)}
+          />
+        ) : null;
+
+      case 'history':
+        return (
+          <HistoryScreen
+            onBack={() => go('profile')}
+            onArticlePress={(id) => go('article-detail', { articleId: id, fromScreen: 'history' })}
+          />
+        );
+
+      case 'factures':
+        return <FacturesScreen onBack={() => go('mon-abonnement')} />;
+
+      case 'mon-abonnement':
+        return userProfile ? (
+          <MonAbonnementScreen
+            userProfile={userProfile}
+            onBack={() => go(nav.params?.fromScreen ?? 'menu')}
+            onModifier={() => go('subscription')}
+            onFactures={() => go('factures')}
+          />
+        ) : null;
+
+      case 'mentions-legales':
+        return <MentionsLegalesScreen onBack={() => go('menu')} />;
 
       case 'about':
         return <AboutScreen onBack={() => go('menu')} />;

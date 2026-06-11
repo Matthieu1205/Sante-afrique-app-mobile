@@ -145,8 +145,7 @@ export const IssueCover: React.FC<{
   issue: MagazineIssue;
   width: number;
   height: number;
-  showLock?: boolean;
-}> = ({ issue, width, height, showLock = true }) => {
+}> = ({ issue, width, height }) => {
   if (issue.coverImage) {
     return (
       <View style={[cvr.wrap, { width, height }]}>
@@ -155,11 +154,6 @@ export const IssueCover: React.FC<{
           style={{ width, height }}
           resizeMode="cover"
         />
-        {showLock && !issue.free && (
-          <View style={cvr.lock}>
-            <Feather name="lock" size={16} color={Colors.white} />
-          </View>
-        )}
       </View>
     );
   }
@@ -170,11 +164,6 @@ export const IssueCover: React.FC<{
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
     >
-      {showLock && !issue.free && (
-        <View style={cvr.lock}>
-          <Feather name="lock" size={14} color={Colors.white} />
-        </View>
-      )}
       <View style={cvr.numBadge}>
         <Text style={cvr.numText}>N°{issue.number}</Text>
       </View>
@@ -195,7 +184,6 @@ const cvr = StyleSheet.create({
     borderRadius: Radius.sm,
     overflow: "hidden",
   },
-  lock: { position: "absolute", top: 8, right: 8 },
   numBadge: {
     position: "absolute",
     top: 8,
@@ -628,7 +616,6 @@ export const MagazineScreen: React.FC<MagazineScreenProps> = ({
                       issue={latest}
                       width={HERO_COVER_W}
                       height={HERO_COVER_H}
-                      showLock={false}
                     />
                   </TouchableOpacity>
                 </View>

@@ -29,6 +29,8 @@ export interface ApiArticleDetail extends ApiArticle {
   sources: string[];
   canonical: string;
   updated_at: string;
+  is_premium?: boolean;
+  is_locked?: boolean;
 }
 
 export interface ApiCategory {
@@ -135,7 +137,14 @@ export async function fetchCategories(): Promise<ApiCategory[]> {
 }
 
 export async function fetchJobs(): Promise<{ items: ApiJob[]; pinned: ApiJob[]; total: number } | null> {
-  return apiFetch<{ items: ApiJob[]; pinned: ApiJob[]; total: number }>('/jobs', 'jobs_v2');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = await apiFetch<any>('/jobs', 'jobs_v2');
+  if (!raw) return null;
+  // Format paginé { data: [] } comme les autres endpoints
+  if (Array.isArray(raw.data)) {
+    return { items: raw.data as ApiJob[], pinned: [], total: (raw.total as number) ?? raw.data.length };
+  }
+  return raw as { items: ApiJob[]; pinned: ApiJob[]; total: number };
 }
 
 export interface ApiBanner {
@@ -284,29 +293,56 @@ export async function forgotPassword(
 export async function postJob(data: {
   title: string;
   company: string;
+  address?: string;
   type: string;
-  location: string;
+  profession?: string;
+  location?: string;
   country: string;
-  email: string;
-  experience?: string;
+  experience_min?: number;
   description?: string;
+  profile?: string;
+  logo_uri?: string | null;
+  logo_name?: string | null;
 }): Promise<{ ok: boolean; message: string; needsSubscription?: boolean }> {
   try {
     const token = await AsyncStorage.getItem('auth_token');
-    const res = await fetch(`${BASE}/jobs`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(data),
-    });
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    let body: FormData | string;
+
+    if (data.logo_uri) {
+      const form = new FormData();
+      form.append('title', data.title);
+      form.append('company', data.company);
+      if (data.address) form.append('address', data.address);
+      form.append('type', data.type);
+      if (data.profession) form.append('profession', data.profession);
+      if (data.location) form.append('location', data.location);
+      form.append('country', data.country);
+      if (data.experience_min !== undefined) form.append('experience_min', String(data.experience_min));
+      if (data.description) form.append('description', data.description);
+      if (data.profile) form.append('profile', data.profile);
+      form.append('logo', { uri: data.logo_uri, type: 'image/jpeg', name: data.logo_name ?? 'logo.jpg' } as unknown as Blob);
+      body = form;
+    } else {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify({
+        title: data.title, company: data.company, address: data.address,
+        type: data.type, profession: data.profession, location: data.location,
+        country: data.country, experience_min: data.experience_min,
+        description: data.description, profile: data.profile,
+      });
+    }
+
+    const res = await fetch(`${BASE}/jobs`, { method: 'POST', headers, body });
     const json = await res.json() as Record<string, unknown>;
     if (res.status === 403) {
-      return { ok: false, needsSubscription: true, message: (json.message as string) ?? 'Un abonnement actif est requis pour poster une offre.' };
+      return { ok: false, needsSubscription: true, message: (json['message'] as string) ?? 'Un abonnement actif est requis pour poster une offre.' };
     }
-    return { ok: res.ok, message: (json.message as string) ?? (res.ok ? 'Offre soumise' : 'Erreur') };
+    return { ok: res.ok, message: (json['message'] as string) ?? (res.ok ? 'Offre soumise' : 'Erreur') };
   } catch {
     return { ok: false, message: 'Impossible de se connecter au serveur' };
   }
@@ -364,8 +400,14 @@ export interface ApplicantCV {
   id: number;
   name: string;
   profession: string;
-  experience: string;
+  experience?: string;
   country: string;
+  city?: string;
+  skills?: string;
+  availability?: string;
+  contract?: string;
+  registered_at?: string;
+  profile_url?: string | null;
   cv_url?: string | null;
 }
 
@@ -374,22 +416,34 @@ export async function browseCVs(filters: {
   experience?: string;
   country?: string;
   contract?: string;
-}): Promise<ApplicantCV[]> {
+  availability?: string;
+  q?: string;
+  sort?: string;
+  page?: number;
+  per_page?: number;
+}): Promise<{ data: ApplicantCV[]; forbidden: boolean; total: number; lastPage: number }> {
   try {
     const token = await AsyncStorage.getItem('auth_token');
     const params = new URLSearchParams();
-    Object.entries(filters).forEach(([k, v]) => { if (v) params.append(k, v); });
+    Object.entries(filters).forEach(([k, v]) => { if (v != null && v !== '') params.append(k, String(v)); });
     const res = await fetch(`${BASE}/cv/browse?${params.toString()}`, {
       headers: {
         Accept: 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
-    if (!res.ok) return [];
-    const json = await res.json() as { data?: ApplicantCV[]; items?: ApplicantCV[] } | ApplicantCV[];
-    if (Array.isArray(json)) return json;
-    return json.data ?? json.items ?? [];
-  } catch { return []; }
+    if (res.status === 401 || res.status === 403) return { data: [], forbidden: true, total: 0, lastPage: 1 };
+    if (!res.ok) return { data: [], forbidden: false, total: 0, lastPage: 1 };
+    const json = await res.json() as {
+      data?: ApplicantCV[]; items?: ApplicantCV[];
+      total?: number; last_page?: number; meta?: { total?: number; last_page?: number };
+    } | ApplicantCV[];
+    if (Array.isArray(json)) return { data: json, forbidden: false, total: json.length, lastPage: 1 };
+    const data = json.data ?? json.items ?? [];
+    const total = json.total ?? json.meta?.total ?? data.length;
+    const lastPage = json.last_page ?? json.meta?.last_page ?? 1;
+    return { data, forbidden: false, total, lastPage };
+  } catch { return { data: [], forbidden: false, total: 0, lastPage: 1 }; }
 }
 
 // ─── Slug resolver ────────────────────────────────────────────────
@@ -479,6 +533,36 @@ export async function getAuthToken(): Promise<string | null> {
   return AsyncStorage.getItem('auth_token');
 }
 
+// ─── Factures ────────────────────────────────────────────────────
+
+export interface ApiInvoice {
+  id: string;
+  number: string;
+  date: string;
+  period_start: string;
+  period_end: string;
+  amount: string;
+  currency: string;
+  status: 'paid' | 'pending' | 'failed';
+  pdf_url: string | null;
+}
+
+export async function fetchInvoices(): Promise<ApiInvoice[]> {
+  try {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return [];
+    const res = await fetch(`${BASE}/user/invoices`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    const json = await res.json() as unknown;
+    const list = Array.isArray(json) ? json : ((json as Record<string, unknown>)['data'] ?? []);
+    return list as ApiInvoice[];
+  } catch {
+    return [];
+  }
+}
+
 // ─── Recherche full-text ──────────────────────────────────────────
 
 export async function searchArticlesApi(query: string): Promise<ApiArticle[]> {
@@ -535,6 +619,23 @@ export interface ApiMagazineIssueDetail extends ApiMagazineIssue {
   sommaire?: ApiMagazineSommaireItem[];
   extrait?: string | null;
   date?: string;
+  read_url?: string | null;
+  pdf_url?: string | null;
+}
+
+export async function fetchMagazineReaderUrl(id: number): Promise<string | null> {
+  try {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return null;
+    const res = await fetch(`${BASE}/magazine/issues/${id}/reader-url`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const json = await res.json() as Record<string, unknown>;
+    return (json['url'] ?? json['reader_url'] ?? json['read_url'] ?? null) as string | null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchMagazineIssueDetail(id: number): Promise<ApiMagazineIssueDetail | null> {
@@ -550,12 +651,20 @@ export async function fetchMagazineIssueDetail(id: number): Promise<ApiMagazineI
     : res;
   console.log('[detail] clés reçues:', Object.keys(payload).join(', '));
 
-  // Normalise le champ sommaire quel que soit le nom utilisé côté backend
+  // Normalise le champ sommaire — l'API peut retourner un tableau OU une chaîne JSON
   const sommaireField = payload['sommaire'] ?? payload['table_of_contents'] ?? payload['toc'] ?? payload['contents'] ?? payload['summary'];
-  const sommaireRaw = sommaireField as ApiMagazineSommaireItem[] | null | undefined;
-  console.log('[detail] sommaire:', Array.isArray(sommaireRaw) ? `${sommaireRaw.length} items` : String(sommaireField ?? 'absent'));
+  let sommaireParsed: ApiMagazineSommaireItem[] | undefined;
+  if (Array.isArray(sommaireField)) {
+    sommaireParsed = sommaireField as ApiMagazineSommaireItem[];
+  } else if (typeof sommaireField === 'string' && sommaireField.trim().startsWith('[')) {
+    try { sommaireParsed = JSON.parse(sommaireField) as ApiMagazineSommaireItem[]; } catch { /* ignore */ }
+  }
 
-  const extraitField = payload['extrait'] ?? payload['excerpt'] ?? payload['extract'];
+  // extrait : uniquement si c'est un texte lisible (pas un JSON de tableau)
+  const rawExtrait = payload['extrait'] ?? payload['excerpt'] ?? payload['extract'];
+  const extraitField = (typeof rawExtrait === 'string' && !rawExtrait.trim().startsWith('['))
+    ? rawExtrait
+    : null;
 
   return {
     id:        payload['id']                               as number,
@@ -566,8 +675,10 @@ export async function fetchMagazineIssueDetail(id: number): Promise<ApiMagazineI
     price:     (payload['price'] ?? '')                   as string,
     cover_url: (payload['cover_url'] ?? payload['cover']) as string | null,
     date:      payload['date']                             as string | undefined,
-    sommaire:  Array.isArray(sommaireRaw) ? sommaireRaw : undefined,
-    extrait:   extraitField as string | null | undefined,
+    sommaire:  sommaireParsed,
+    extrait:   extraitField,
+    read_url:  (payload['read_url'] ?? null)               as string | null,
+    pdf_url:   (payload['pdf_url'] ?? null)                as string | null,
   };
 }
 
@@ -663,22 +774,356 @@ export interface UserProfile {
   id: number;
   name: string;
   email: string;
-  subscription?: { plan: string; expires_at: string | null; is_active: boolean } | null;
+  phone?: string;
+  country?: string;
+  subscription?: {
+    plan: string;
+    starts_at?: string | null;
+    expires_at: string | null;
+    is_active: boolean;
+  } | null;
+}
+
+export interface ApplicationItem {
+  id: number;
+  job_id?: number;
+  job_title: string;
+  company: string;
+  status: string;
+  created_at: string;
+}
+
+export interface NewsletterItem {
+  id: number;
+  name: string;
+  description?: string;
+  subscribed: boolean;
+}
+
+async function fetchUserSubscription(token: string): Promise<UserProfile['subscription']> {
+  // Endpoints dédiés uniquement (pas /user qui renvoie l'objet user)
+  const candidates = [
+    `${BASE}/user/subscription`,
+    `${BASE}/subscriptions/active`,
+    `${BASE}/subscriptions/current`,
+    `${BASE}/user/subscriptions`,
+    `${BASE}/subscription`,
+  ];
+  for (const url of candidates) {
+    try {
+      const r = await fetch(url, {
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      });
+      console.log('[sub] url:', url, 'status:', r.status);
+      if (!r.ok) continue;
+      const j = await r.json() as Record<string, unknown>;
+      const s = (j.data ?? j) as Record<string, unknown>;
+      // Valider que c'est bien un objet abonnement (pas un objet user)
+      // Un objet user a 'email' mais pas 'expires_at' ni 'plan'
+      const looksLikeSubscription = s.expires_at !== undefined || s.plan !== undefined || s.end_date !== undefined;
+      if (!looksLikeSubscription) {
+        console.log('[sub] réponse ignorée (objet user, pas abonnement)');
+        continue;
+      }
+      console.log('[sub] abonnement trouvé:', JSON.stringify(s));
+      return {
+        plan:       (s.plan ?? s.label ?? s.name ?? s.plan_name ?? '') as string,
+        starts_at:  (s.starts_at ?? s.started_at ?? s.start_date ?? s.created_at ?? null) as string | null,
+        expires_at: (s.expires_at ?? s.end_date ?? s.expiry ?? s.expire_at ?? null) as string | null,
+        is_active:  !!(s.is_active ?? s.active ?? (s.status === 'active' || s.status === 1)),
+      };
+    } catch { continue; }
+  }
+  console.log('[sub] aucun endpoint abonnement disponible — contacter le backend');
+  return null;
 }
 
 export async function fetchUserProfile(): Promise<UserProfile | null> {
   try {
     const token = await AsyncStorage.getItem('auth_token');
-    if (!token) return null;
+    if (!token) { console.log('[profile] pas de token'); return null; }
     const res = await fetch(`${BASE}/user`, {
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
     });
+    console.log('[profile] status HTTP:', res.status);
     if (!res.ok) return null;
     const json = await res.json() as Record<string, unknown>;
-    const profile = (json.data ?? json) as UserProfile;
-    if (!profile?.id) return null;
-    return profile;
-  } catch { return null; }
+    const raw = (json.data ?? json) as Record<string, unknown>;
+    if (!raw?.id) return null;
+
+    // Tente d'abord l'objet subscription dans /user
+    const subInUser = (raw.subscription ?? raw.abonnement ?? raw.user_subscription ?? null) as Record<string, unknown> | null;
+    let subscription: UserProfile['subscription'] = null;
+
+    if (subInUser && typeof subInUser === 'object' && (subInUser.expires_at !== undefined || subInUser.plan !== undefined)) {
+      subscription = {
+        plan:       (subInUser.plan ?? subInUser.label ?? subInUser.name ?? '') as string,
+        starts_at:  (subInUser.starts_at ?? subInUser.started_at ?? subInUser.start_date ?? null) as string | null,
+        expires_at: (subInUser.expires_at ?? subInUser.end_date ?? null) as string | null,
+        is_active:  !!(subInUser.is_active ?? subInUser.active ?? subInUser.status === 'active'),
+      };
+    } else {
+      subscription = await fetchUserSubscription(token);
+    }
+    return {
+      id:           raw.id as number,
+      name:         (raw.name ?? raw.full_name ?? '') as string,
+      email:        (raw.email ?? '') as string,
+      phone:        (raw.phone ?? raw.telephone ?? raw.mobile ?? '') as string | undefined,
+      country:      (raw.country ?? raw.pays ?? raw.country_name ?? '') as string | undefined,
+      subscription,
+    };
+  } catch (e) {
+    console.log('[profile] erreur:', String(e));
+    return null;
+  }
+}
+
+// ─── Mise à jour profil ───────────────────────────────────────────
+
+export async function updateUserProfile(data: {
+  name?: string;
+  phone?: string;
+  country?: string;
+}): Promise<{ ok: boolean; message: string }> {
+  try {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return { ok: false, message: 'Non authentifié' };
+    const res = await fetch(`${BASE}/user/profile`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json() as Record<string, unknown>;
+    if (!res.ok) return { ok: false, message: (json.message as string) ?? 'Erreur lors de la mise à jour' };
+    return { ok: true, message: 'Profil mis à jour avec succès' };
+  } catch {
+    return { ok: false, message: 'Impossible de se connecter au serveur' };
+  }
+}
+
+// ─── Candidatures ─────────────────────────────────────────────────
+
+export async function fetchMyApplications(): Promise<ApplicationItem[]> {
+  try {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return [];
+    const res = await fetch(`${BASE}/user/applications`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    const json = await res.json() as Record<string, unknown>;
+    const data = (json.data ?? json) as unknown[];
+    if (!Array.isArray(data)) return [];
+    return data.map((item) => {
+      const a = item as Record<string, unknown>;
+      const job = (a.job ?? {}) as Record<string, unknown>;
+      return {
+        id: a.id as number,
+        job_id: (a.job_id ?? job.id) as number | undefined,
+        job_title: (a.job_title ?? job.title ?? a.title ?? 'Poste non précisé') as string,
+        company: (a.company ?? job.company ?? '—') as string,
+        status: (a.status ?? 'pending') as string,
+        created_at: (a.created_at ?? a.applied_at ?? '') as string,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+// ─── Newsletters ──────────────────────────────────────────────────
+
+export async function fetchNewsletterPreferences(): Promise<NewsletterItem[]> {
+  try {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return [];
+    const res = await fetch(`${BASE}/user/newsletters`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    const json = await res.json() as Record<string, unknown>;
+    const data = (json.data ?? json) as unknown[];
+    if (!Array.isArray(data)) return [];
+    return data.map((item) => {
+      const n = item as Record<string, unknown>;
+      return {
+        id: n.id as number,
+        name: (n.name ?? n.label ?? n.title ?? '') as string,
+        description: (n.description ?? n.desc ?? '') as string | undefined,
+        subscribed: !!(n.subscribed ?? n.is_subscribed ?? n.active),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function toggleNewsletter(id: number, subscribed: boolean): Promise<{ ok: boolean }> {
+  try {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return { ok: false };
+    const res = await fetch(`${BASE}/user/newsletters/${id}/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ subscribed }),
+    });
+    return { ok: res.ok };
+  } catch {
+    return { ok: false };
+  }
+}
+
+// ─── Changer mot de passe ─────────────────────────────────────────
+
+export async function changePassword(data: {
+  current_password: string;
+  new_password: string;
+  new_password_confirmation: string;
+}): Promise<{ ok: boolean; message: string }> {
+  try {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return { ok: false, message: 'Non authentifié' };
+    const res = await fetch(`${BASE}/user/change-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json() as Record<string, unknown>;
+    if (!res.ok) return { ok: false, message: (json.message as string) ?? 'Erreur lors du changement' };
+    return { ok: true, message: (json.message as string) ?? 'Mot de passe modifié avec succès' };
+  } catch {
+    return { ok: false, message: 'Impossible de se connecter au serveur' };
+  }
+}
+
+// ─── Candidature à une offre ──────────────────────────────────────
+
+export async function applyToJob(jobId: string | number): Promise<{ ok: boolean; message: string; alreadyApplied?: boolean }> {
+  try {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return { ok: false, message: 'Vous devez être connecté pour postuler' };
+    const res = await fetch(`${BASE}/jobs/${jobId}/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+    });
+    const json = await res.json() as Record<string, unknown>;
+    if (res.status === 409) return { ok: false, alreadyApplied: true, message: 'Vous avez déjà postulé à cette offre' };
+    if (!res.ok) return { ok: false, message: (json.message as string) ?? 'Erreur lors de la candidature' };
+    return { ok: true, message: (json.message as string) ?? 'Candidature envoyée avec succès' };
+  } catch {
+    return { ok: false, message: 'Impossible de se connecter au serveur' };
+  }
+}
+
+// ─── Export CSV CVthèque ──────────────────────────────────────────
+
+export async function exportCVsUrl(filters: {
+  profession?: string;
+  country?: string;
+  availability?: string;
+  contract?: string;
+  experience?: string;
+  q?: string;
+  sort?: string;
+}): Promise<string | null> {
+  try {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return null;
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => { if (v != null && v !== '') params.append(k, String(v)); });
+    return `${BASE}/cv/browse/export?${params.toString()}&token=${encodeURIComponent(token)}`;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Préférences utilisateur ──────────────────────────────────────
+
+export async function syncUserPreferences(prefs: {
+  country?: string;
+  topics?: string[];
+  text_size?: string;
+}): Promise<void> {
+  try {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return;
+    await fetch(`${BASE}/user/preferences`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(prefs),
+    });
+  } catch {}
+}
+
+// ─── Préférences notifications ────────────────────────────────────
+
+export async function syncNotificationPreferences(enabled: boolean): Promise<void> {
+  try {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return;
+    await fetch(`${BASE}/user/notification-preferences`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ notifications_enabled: enabled }),
+    });
+  } catch {}
+}
+
+// ─── Historique lecture distant ───────────────────────────────────
+
+export async function trackReadingHistoryRemote(articleId: string, title: string): Promise<void> {
+  try {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return;
+    await fetch(`${BASE}/user/reading-history`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ article_id: articleId, title, read_at: new Date().toISOString() }),
+    });
+  } catch {}
+}
+
+// ─── Suggestions de recherche ─────────────────────────────────────
+
+export async function fetchSearchSuggestions(): Promise<string[]> {
+  try {
+    const res = await fetch(`${BASE}/search/suggestions`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+    const json = await res.json() as unknown;
+    if (Array.isArray(json)) return json.map(String);
+    const data = (json as Record<string, unknown>).data;
+    if (Array.isArray(data)) return data.map(String);
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+// ─── Partenaires ──────────────────────────────────────────────────
+
+export async function fetchPartners(): Promise<string[]> {
+  try {
+    const res = await fetch(`${BASE}/partners`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+    const json = await res.json() as unknown;
+    if (Array.isArray(json)) return json.map((p) => {
+      const item = p as Record<string, unknown>;
+      return (item.name ?? item.label ?? String(p)) as string;
+    });
+    const data = (json as Record<string, unknown>).data;
+    if (Array.isArray(data)) return data.map((p) => {
+      const item = p as Record<string, unknown>;
+      return (item.name ?? item.label ?? String(p)) as string;
+    });
+    return [];
+  } catch {
+    return [];
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────

@@ -4,8 +4,10 @@ import { FontFamily, FontSize, Radius, Spacing } from "@/theme";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { ThemeColors } from "@/contexts/ThemeContext";
 import { fetchArticleDetail, fetchArticlesByRubrique, formatDate, getImageUrl } from "@/services/api";
+import { trackArticleRead } from "@/services/history";
 import { addBookmark, categoryLabel, isBookmarked, removeBookmark, typeLabel } from "@/services/bookmarks";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useRef, useState } from "react";
 import WebView from 'react-native-webview';
@@ -67,6 +69,27 @@ function estimateReadingTime(html: string): number {
   return Math.max(1, Math.round(words / 200));
 }
 
+function chunkText(text: string, maxLen: number): string[] {
+  if (text.length <= maxLen) return [text];
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = Math.min(start + maxLen, text.length);
+    if (end < text.length) {
+      const lastPeriod = text.lastIndexOf('. ', end);
+      if (lastPeriod > start + maxLen / 2) end = lastPeriod + 2;
+      else {
+        const lastSpace = text.lastIndexOf(' ', end);
+        if (lastSpace > start) end = lastSpace + 1;
+      }
+    }
+    const chunk = text.slice(start, end).trim();
+    if (chunk) chunks.push(chunk);
+    start = end;
+  }
+  return chunks.length > 0 ? chunks : [text.slice(0, maxLen)];
+}
+
 interface ArticleDetail extends Article {
   author: string;
   readingTime: number;
@@ -74,6 +97,7 @@ interface ArticleDetail extends Article {
   tags: string[];
   canonicalUrl?: string;
   rawBody?: string;
+  isPremiumContent?: boolean;
 }
 
 const MOCK_DETAIL: ArticleDetail = {
@@ -325,6 +349,7 @@ interface ArticleDetailScreenProps {
   onArticlePress?: (articleId: string) => void;
   isSubscriber?: boolean;
   onSubscribePress?: () => void;
+  onLoginPress?: () => void;
 }
 
 const makeStyles = (C: ThemeColors, fontScale = 1) => StyleSheet.create({
@@ -369,6 +394,71 @@ const makeStyles = (C: ThemeColors, fontScale = 1) => StyleSheet.create({
   tagText: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textMuted },
   relatedSection: { marginTop: Spacing["4"], borderTopWidth: 4, borderTopColor: C.background },
   relatedTitle: { fontFamily: FontFamily.headingBold, fontSize: FontSize.lg, color: C.textPrimary, paddingHorizontal: Spacing["4"], paddingVertical: Spacing["3"] },
+
+  // ── Paywall ──────────────────────────────────────────────────────
+  paywallWrap: {
+    marginTop: -32,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: C.borderLight,
+  },
+  paywallGradient: {
+    paddingTop: 48,
+    paddingBottom: Spacing["5"],
+    paddingHorizontal: Spacing["4"],
+    alignItems: 'center',
+    gap: Spacing["3"],
+  },
+  paywallIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: C.primaryUltraLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing["1"],
+  },
+  paywallTitle: {
+    fontFamily: FontFamily.headingBold,
+    fontSize: FontSize.lg,
+    color: C.textPrimary,
+    textAlign: 'center',
+  },
+  paywallSub: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.sm,
+    color: C.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  paywallBtnPrimary: {
+    width: '100%',
+    backgroundColor: '#1B9DD9',
+    borderRadius: Radius.sm,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginTop: Spacing["2"],
+  },
+  paywallBtnPrimaryText: {
+    fontFamily: FontFamily.bodyBold,
+    fontSize: FontSize.sm,
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
+  paywallBtnOutline: {
+    width: '100%',
+    borderWidth: 1.5,
+    borderColor: C.border,
+    borderRadius: Radius.sm,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  paywallBtnOutlineText: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: FontSize.sm,
+    color: C.textPrimary,
+  },
 });
 
 // ─── Rendu HTML du corps de l'article ────────────────────────────
@@ -477,8 +567,9 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
   article: articleProp = MOCK_DETAIL,
   onBack,
   onArticlePress,
-  isSubscriber: _isSubscriber = false,
-  onSubscribePress: _onSubscribePress,
+  isSubscriber = false,
+  onSubscribePress,
+  onLoginPress,
 }) => {
   const { colors, fontScale, isDark } = useTheme();
   const styles = makeStyles(colors, fontScale);
@@ -489,6 +580,24 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
   const [audioSpeed, setAudioSpeed] = useState(1);
   const [relatedArticles, setRelatedArticles] = useState<Article[]>(RELATED_ARTICLES);
 
+  const chunksRef = useRef<string[]>([]);
+  const chunkIdxRef = useRef(0);
+  const speedRef = useRef(1);
+  const speakNext = useRef<((idx: number) => void) | undefined>(undefined);
+
+  speakNext.current = (idx: number) => {
+    const chunks = chunksRef.current;
+    if (idx >= chunks.length) { setAudioPlaying(false); return; }
+    chunkIdxRef.current = idx;
+    Speech.speak(chunks[idx], {
+      language: 'fr-FR',
+      rate: speedRef.current * 0.88,
+      onDone: () => speakNext.current!(idx + 1),
+      onStopped: () => {},
+      onError: () => setAudioPlaying(false),
+    });
+  };
+
   const articleUrl = article.canonicalUrl ?? `https://santeafrique.net/articles/${article.id}`;
 
   const toggleAudio = async () => {
@@ -496,41 +605,31 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
       await Speech.stop();
       setAudioPlaying(false);
     } else {
-      const text = [article.title, ...article.content].join('. ');
-      Speech.speak(text, {
-        language: 'fr-FR',
-        rate: audioSpeed * 0.88,
-        onStart: () => setAudioPlaying(true),
-        onDone: () => setAudioPlaying(false),
-        onStopped: () => setAudioPlaying(false),
-        onError: () => setAudioPlaying(false),
-      });
+      const rawText = [article.title, ...article.content].join('. ');
+      chunksRef.current = chunkText(rawText, 3000);
+      chunkIdxRef.current = 0;
+      setAudioPlaying(true);
+      speakNext.current!(0);
     }
   };
 
   const stopAudio = async () => {
+    chunksRef.current = [];
     await Speech.stop();
     setAudioPlaying(false);
   };
 
   const handleSpeedChange = async (newSpeed: number) => {
+    speedRef.current = newSpeed;
     setAudioSpeed(newSpeed);
     if (audioPlaying) {
       await Speech.stop();
-      const text = [article.title, ...article.content].join('. ');
-      Speech.speak(text, {
-        language: 'fr-FR',
-        rate: newSpeed * 0.88,
-        onStart: () => setAudioPlaying(true),
-        onDone: () => setAudioPlaying(false),
-        onStopped: () => setAudioPlaying(false),
-        onError: () => setAudioPlaying(false),
-      });
+      speakNext.current!(chunkIdxRef.current);
     }
   };
 
   useEffect(() => {
-    return () => { Speech.stop(); };
+    return () => { chunksRef.current = []; Speech.stop(); };
   }, []);
 
   useEffect(() => {
@@ -579,8 +678,15 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
         tags: res.tags ?? [],
         canonicalUrl: res.canonical,
         rawBody: res.body,
+        isPremiumContent: (res.is_locked ?? res.is_premium) ?? false,
       });
       setLoading(false);
+      trackArticleRead({
+        id: String(res.id),
+        title: res.title,
+        category: res.category?.slug ?? 'actualites',
+        imageUrl: getImageUrl(res) ?? undefined,
+      });
 
       // Charge les articles similaires de la même catégorie
       fetchArticlesByRubrique(categorySlug, 1).then((similar) => {
@@ -660,7 +766,7 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
 
           <View style={styles.separator} />
 
-          {article.hasAudio && (
+          {(
             <AudioBar
               isPlaying={audioPlaying}
               onToggle={toggleAudio}
@@ -671,17 +777,48 @@ export const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({
             />
           )}
 
-          {article.rawBody ? (
-            <ArticleBodyWebView
-              html={article.rawBody}
-              isDark={isDark}
-              fontScale={fontScale}
-            />
-          ) : (
-            article.content.map((paragraph, i) => (
-              <Text key={i} style={styles.paragraph}>{paragraph}</Text>
-            ))
-          )}
+          {(() => {
+            const isLocked = (article.isPremiumContent ?? article.isPremium) && !isSubscriber;
+            if (isLocked) {
+              // Affiche les 2 premiers paragraphes puis le paywall
+              const preview = article.content.slice(0, 2);
+              return (
+                <>
+                  {preview.map((paragraph, i) => (
+                    <Text key={i} style={styles.paragraph}>{paragraph}</Text>
+                  ))}
+                  <View style={styles.paywallWrap}>
+                    <LinearGradient
+                      colors={[`${colors.backgroundCard}00`, colors.backgroundCard]}
+                      style={{ height: 48, marginBottom: -1 }}
+                    />
+                    <View style={styles.paywallGradient}>
+                      <View style={styles.paywallIcon}>
+                        <Feather name="lock" size={22} color={colors.primary} />
+                      </View>
+                      <Text style={styles.paywallTitle}>Contenu réservé aux abonnés</Text>
+                      <Text style={styles.paywallSub}>
+                        Abonnez-vous pour accéder à l'intégralité de cet article et à tous les contenus Santé Afrique.
+                      </Text>
+                      <TouchableOpacity style={styles.paywallBtnPrimary} onPress={onSubscribePress} activeOpacity={0.85}>
+                        <Text style={styles.paywallBtnPrimaryText}>S'abonner — À partir de 1 250 FCFA/mois</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.paywallBtnOutline} onPress={onLoginPress} activeOpacity={0.8}>
+                        <Text style={styles.paywallBtnOutlineText}>J'ai déjà un compte</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </>
+              );
+            }
+            return article.rawBody ? (
+              <ArticleBodyWebView html={article.rawBody} isDark={isDark} fontScale={fontScale} />
+            ) : (
+              article.content.map((paragraph, i) => (
+                <Text key={i} style={styles.paragraph}>{paragraph}</Text>
+              ))
+            );
+          })()}
 
           <ShareBar title={article.title} url={articleUrl} />
 

@@ -16,7 +16,7 @@ import { Feather } from '@expo/vector-icons';
 import { FontFamily, FontSize, Spacing, Radius } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
-import { searchArticlesApi, formatDate, getImageUrl } from '@/services/api';
+import { searchArticlesApi, fetchSearchSuggestions, formatDate, getImageUrl } from '@/services/api';
 import type { ApiArticle } from '@/services/api';
 
 function mapArticle(a: ApiArticle): Article {
@@ -31,7 +31,7 @@ function mapArticle(a: ApiArticle): Article {
 }
 
 const RECENT_SEARCHES_INITIAL = ['paludisme', 'santé maternelle', 'nutrition infantile'];
-const SUGGESTIONS = ['paludisme', 'vaccination', 'maternité', 'nutrition', 'OMS', 'diabète', 'cancer', 'mental'];
+const SUGGESTIONS_FALLBACK = ['paludisme', 'vaccination', 'maternité', 'nutrition', 'OMS', 'diabète', 'cancer', 'mental'];
 
 interface SearchScreenProps {
   onArticlePress: (articleId: string) => void;
@@ -164,8 +164,15 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
   const [recentSearches, setRecentSearches] = useState<string[]>(RECENT_SEARCHES_INITIAL);
   const [results, setResults] = useState<Article[]>([]);
   const [searching, setSearching] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>(SUGGESTIONS_FALLBACK);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    fetchSearchSuggestions().then((data) => {
+      if (data.length > 0) setSuggestions(data);
+    });
+  }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -302,7 +309,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Thèmes populaires</Text>
                 <View style={styles.suggestionsWrap}>
-                  {SUGGESTIONS.map((s) => (
+                  {suggestions.map((s) => (
                     <TouchableOpacity
                       key={s}
                       style={styles.suggestionChip}

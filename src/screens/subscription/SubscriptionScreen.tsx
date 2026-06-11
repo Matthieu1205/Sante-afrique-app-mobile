@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,10 @@ import {
   StatusBar,
   Linking,
   ActivityIndicator,
+  LayoutChangeEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -111,30 +113,66 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
 
   // Hero
   hero: {
-    backgroundColor: BRAND,
-    marginHorizontal: Spacing['4'],
-    marginTop: Spacing['4'],
-    borderRadius: Radius.lg,
-    padding: Spacing['5'],
+    paddingHorizontal: Spacing['5'],
+    paddingTop: Spacing['6'],
+    paddingBottom: Spacing['6'],
+  },
+  heroTag: {
+    fontFamily: FontFamily.bodyBold,
+    fontSize: 11,
+    color: BRAND,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: Spacing['3'],
   },
   heroTitle: {
     fontFamily: FontFamily.headingBold,
-    fontSize: FontSize.xl,
-    color: '#1C1C1E',
-    lineHeight: 30,
-    marginBottom: Spacing['2'],
+    fontSize: 32,
+    color: '#FFFFFF',
+    lineHeight: 38,
+    marginBottom: Spacing['3'],
   },
   heroSub: {
     fontFamily: FontFamily.body,
-    fontSize: FontSize.sm,
-    color: '#1C1C1E',
-    lineHeight: 22,
-    marginBottom: Spacing['3'],
-    opacity: 0.85,
+    fontSize: FontSize.base,
+    color: 'rgba(255,255,255,0.75)',
+    lineHeight: 24,
+    marginBottom: Spacing['5'],
   },
-  heroChecks: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing['3'] },
+  heroChecks: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing['2'], marginBottom: Spacing['6'] },
   heroCheck: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  heroCheckText: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: '#1C1C1E', opacity: 0.9 },
+  heroDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: BRAND },
+  heroCheckText: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.85)' },
+  heroBtnRow: { flexDirection: 'row', gap: Spacing['3'] },
+  heroBtnPrimary: {
+    flex: 1,
+    backgroundColor: BRAND,
+    borderRadius: Radius.sm,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  heroBtnPrimaryText: {
+    fontFamily: FontFamily.bodyBold,
+    fontSize: FontSize.sm,
+    color: '#fff',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  heroBtnOutline: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.45)',
+    borderRadius: Radius.sm,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  heroBtnOutlineText: {
+    fontFamily: FontFamily.bodyBold,
+    fontSize: FontSize.sm,
+    color: '#fff',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
 
   // Plans
   plansSection: { paddingHorizontal: Spacing['4'], paddingTop: Spacing['6'] },
@@ -368,8 +406,13 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
   const { colors, isDark } = useTheme();
   const styles = makeStyles(colors);
 
+  const scrollRef = useRef<ScrollView>(null);
+  const plansOffsetY = useRef<number>(0);
+
   const [plans, setPlans] = useState<Plan[]>(PLANS_FALLBACK);
   const [loadingPlans, setLoadingPlans] = useState(true);
+
+  const scrollToPlans = () => scrollRef.current?.scrollTo({ y: plansOffsetY.current, animated: true });
 
   useEffect(() => {
     fetchSubscriptionPlans().then((data) => {
@@ -400,26 +443,38 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
         {onBack && <View style={{ width: 36 }} />}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
 
-        {/* Hero vert */}
-        <View style={styles.hero}>
-          <Text style={styles.heroTitle}>Abonnez-vous à Santé Afrique</Text>
+        {/* Hero navy sombre */}
+        <LinearGradient colors={['#0D1B2A', '#0D2137']} style={styles.hero}>
+          <Text style={styles.heroTag}>Abonnement</Text>
+          <Text style={styles.heroTitle}>Le magazine santé{'\n'}de référence en Afrique</Text>
           <Text style={styles.heroSub}>
-            Le média santé de référence en Afrique : dossiers, enquêtes, interviews et retours d'expérience utiles pour décider et agir.
+            Dossiers exclusifs, interviews d'experts, retours du terrain — accédez à tout le contenu Santé Afrique, où que vous soyez.
           </Text>
           <View style={styles.heroChecks}>
-            {['Accès illimité aux archives', '6 numéros numériques / an', 'Lecture multi-supports'].map((item) => (
+            {['6 numéros / an', 'Archives complètes', 'Multi-appareils', 'Sans engagement'].map((item) => (
               <View key={item} style={styles.heroCheck}>
-                <Feather name="check" size={13} color="#1C1C1E" />
+                <View style={styles.heroDot} />
                 <Text style={styles.heroCheckText}>{item}</Text>
               </View>
             ))}
           </View>
-        </View>
+          <View style={styles.heroBtnRow}>
+            <TouchableOpacity style={styles.heroBtnPrimary} onPress={scrollToPlans} activeOpacity={0.85}>
+              <Text style={styles.heroBtnPrimaryText}>Voir les offres</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.heroBtnOutline} onPress={onLogin} activeOpacity={0.85}>
+              <Text style={styles.heroBtnOutlineText}>J'ai déjà un compte</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
 
         {/* Plans */}
-        <View style={styles.plansSection}>
+        <View
+          style={styles.plansSection}
+          onLayout={(e: LayoutChangeEvent) => { plansOffsetY.current = e.nativeEvent.layout.y; }}
+        >
           <Text style={styles.plansSectionTitle}>Choisissez la formule qui vous convient</Text>
 
           {loadingPlans ? (
@@ -458,10 +513,10 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({
 
               <TouchableOpacity
                 style={[styles.planCta, { backgroundColor: plan.ctaColor }]}
-                onPress={() => onSubscribe?.(plan.id)}
+                onPress={() => Linking.openURL('https://santeafrique.net/abonnement')}
                 activeOpacity={0.85}
               >
-                <Text style={styles.planCtaText}>S'abonner</Text>
+                <Text style={styles.planCtaText}>S'abonner sur le site</Text>
               </TouchableOpacity>
             </View>
           ))}

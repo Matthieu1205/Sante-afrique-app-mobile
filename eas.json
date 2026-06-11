@@ -9,13 +9,33 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "channel": "production",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "simulator": false
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-play-key.json",
+        "track": "internal"
+      },
+      "ios": {
+        "appleId": "mathieuadou30@gmail.com",
+        "ascAppId": "VOTRE_APP_STORE_CONNECT_ID",
+        "appleTeamId": "VOTRE_TEAM_ID"
+      }
+    }
   }
 }

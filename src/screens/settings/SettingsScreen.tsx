@@ -16,6 +16,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
 
 import { savePreferredSlugs } from '@/services/preferences';
+import { syncUserPreferences, syncNotificationPreferences } from '@/services/api';
 
 const TOPICS_KEY     = 'settings_topics_v1';
 const DEFAULT_TOPICS = ['actualites', 'dossiers', 'vaccination'];
@@ -222,10 +223,23 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setSelectedTopics((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
-      // Sauvegarde les IDs bruts (la conversion en slugs se fait dans preferences.ts)
-      savePreferredSlugs([...next]);
+      const slugs = [...next];
+      savePreferredSlugs(slugs);
+      syncUserPreferences({ topics: slugs }).catch(() => {});
       return next;
     });
+  };
+
+  const handleCountryChange = (code: string) => {
+    setSelectedCountry(code);
+    setShowCountryPicker(false);
+    const found = COUNTRIES.find((c) => c.code === code);
+    if (found) syncUserPreferences({ country: found.label }).catch(() => {});
+  };
+
+  const handleNotifToggle = (value: boolean) => {
+    setNotifEnabled(value);
+    syncNotificationPreferences(value).catch(() => {});
   };
 
   const country = COUNTRIES.find((c) => c.code === selectedCountry)!;
@@ -274,7 +288,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <TouchableOpacity
                   key={c.code}
                   style={[styles.pickerRow, selectedCountry === c.code && styles.pickerRowActive]}
-                  onPress={() => { setSelectedCountry(c.code); setShowCountryPicker(false); }}
+                  onPress={() => handleCountryChange(c.code)}
                 >
                   <Text style={styles.pickerFlag}>{c.flag}</Text>
                   <Text style={[styles.pickerLabel, selectedCountry === c.code && styles.pickerLabelActive]}>
@@ -323,7 +337,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </View>
             <Switch
               value={notifEnabled}
-              onValueChange={setNotifEnabled}
+              onValueChange={handleNotifToggle}
               trackColor={{ false: colors.border, true: colors.primaryLight }}
               thumbColor={notifEnabled ? colors.primary : colors.white}
             />

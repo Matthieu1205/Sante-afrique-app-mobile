@@ -14,57 +14,45 @@ import { Feather } from '@expo/vector-icons';
 import { FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
-import { fetchArticles, formatDate } from '@/services/api';
-import { markAllRead, isRead } from '@/services/notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  getStoredNotifications,
+  markStoredRead,
+  markAllStoredRead,
+  countUnread,
+} from '@/services/notifications';
+import type { StoredNotification, NotifType } from '@/services/notifications';
 
 interface NotificationsScreenProps {
   onBack?: () => void;
   onArticlePress?: (id: string) => void;
+  onMagazinePress?: () => void;
   onUnreadChange?: (count: number) => void;
 }
 
 type Tab = 'alerts' | 'settings';
 type FeatherName = React.ComponentProps<typeof Feather>['name'];
 
-interface NotifItem {
-  id: string;
-  title: string;
-  time: string;
-  category: string;
-  read: boolean;
-  icon: FeatherName;
-}
-
 interface TopicData {
   id: string; label: string; sublabel: string; icon: FeatherName;
 }
 
 const ALERT_TOPICS: TopicData[] = [
-  { id: 'breaking',    label: 'Alertes urgentes',  sublabel: 'Épidémies, crises sanitaires',   icon: 'alert-triangle' },
-  { id: 'actualites',  label: 'Actualités santé',  sublabel: 'Nouvelles quotidiennes',          icon: 'file-text'      },
-  { id: 'vaccination', label: 'Vaccination',        sublabel: 'Campagnes et rappels',            icon: 'thermometer'    },
-  { id: 'dossiers',    label: 'Nouveaux dossiers',  sublabel: 'Publications hebdomadaires',      icon: 'clipboard'      },
-  { id: 'business',    label: 'Business Santé',     sublabel: 'Marché et innovations',           icon: 'briefcase'      },
-  { id: 'evenements',  label: 'Événements',          sublabel: 'Conférences et formations',       icon: 'calendar'       },
+  { id: 'breaking',    label: 'Alertes urgentes',   sublabel: 'Épidémies, crises sanitaires',    icon: 'alert-triangle' },
+  { id: 'actualites',  label: 'Actualités santé',   sublabel: 'Nouvelles quotidiennes',           icon: 'file-text'      },
+  { id: 'vaccination', label: 'Vaccination',         sublabel: 'Campagnes et rappels',             icon: 'thermometer'    },
+  { id: 'dossiers',    label: 'Nouveaux dossiers',   sublabel: 'Publications hebdomadaires',       icon: 'clipboard'      },
+  { id: 'business',    label: 'Business Santé',      sublabel: 'Marché et innovations',            icon: 'briefcase'      },
+  { id: 'evenements',  label: 'Événements',           sublabel: 'Conférences et formations',        icon: 'calendar'       },
 ];
 
-const CATEGORY_ICONS: Record<string, FeatherName> = {
-  'business-sante':      'briefcase',
-  'vaccination':         'thermometer',
-  'sante-maternelle':    'heart',
-  'one-health':          'feather',
-  'sante-mentale':       'activity',
-  'nutrition-infantile': 'droplet',
-  'les-odd':             'globe',
-  'equite-acces':        'sliders',
-  'conseils-pratiques':  'zap',
-  'dossier':             'clipboard',
-  'actualites':          'file-text',
+const TYPE_META: Record<NotifType, { icon: FeatherName; color: string; label: string }> = {
+  article:      { icon: 'file-text',      color: '#1B9DD9', label: 'Article'      },
+  magazine:     { icon: 'book-open',      color: '#8E44AD', label: 'Magazine'     },
+  subscription: { icon: 'star',           color: '#E67E22', label: 'Abonnement'   },
+  update:       { icon: 'download-cloud', color: '#27AE60', label: 'Mise à jour'  },
+  info:         { icon: 'bell',           color: '#8E8E93', label: 'Info'         },
 };
-
-function iconForCategory(slug: string): FeatherName {
-  return CATEGORY_ICONS[slug] ?? 'bell';
-}
 
 function relativeTime(dateStr: string): string {
   try {
@@ -75,7 +63,7 @@ function relativeTime(dateStr: string): string {
     const d = Math.floor(h / 24);
     if (d === 1) return 'Hier';
     if (d < 7) return `Il y a ${d} jours`;
-    return formatDate(dateStr);
+    return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
   } catch { return ''; }
 }
 
@@ -111,35 +99,44 @@ const makeNotifStyle = (C: ThemeColors) => StyleSheet.create({
     justifyContent: 'center',
     marginLeft: Spacing['1'],
   },
-  content: { flex: 1, gap: 4 },
+  content: { flex: 1, gap: 3 },
   title: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textSecondary, lineHeight: 20 },
   titleUnread: { fontFamily: FontFamily.bodySemiBold, color: C.textPrimary },
-  meta: { flexDirection: 'row', alignItems: 'center' },
-  category: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.primary },
+  body: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textMuted, lineHeight: 18 },
+  meta: { flexDirection: 'row', alignItems: 'center', marginTop: 1 },
+  typeLabel: { fontFamily: FontFamily.body, fontSize: FontSize.xs },
   sep: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textDisabled },
   time: { fontFamily: FontFamily.body, fontSize: FontSize.xs, color: C.textDisabled },
 });
 
-const NotifRow: React.FC<{ item: NotifItem; onPress: () => void }> = ({ item, onPress }) => {
+const NotifRow: React.FC<{ item: StoredNotification; onPress: () => void }> = ({ item, onPress }) => {
   const { colors } = useTheme();
   const s = makeNotifStyle(colors);
+  const meta = TYPE_META[item.type];
   return (
     <TouchableOpacity style={[s.row, !item.read && s.rowUnread]} onPress={onPress} activeOpacity={0.75}>
       {!item.read && <View style={s.dot} />}
-      <View style={s.iconWrap}>
-        <Feather name={item.icon} size={20} color={colors.textSecondary} />
+      <View style={[s.iconWrap, { backgroundColor: item.read ? colors.background : `${meta.color}18` }]}>
+        <Feather name={meta.icon} size={20} color={item.read ? colors.textSecondary : meta.color} />
       </View>
       <View style={s.content}>
         <Text style={[s.title, !item.read && s.titleUnread]} numberOfLines={2}>{item.title}</Text>
+        {!!item.body && (
+          <Text style={s.body} numberOfLines={2}>{item.body}</Text>
+        )}
         <View style={s.meta}>
-          <Text style={s.category}>{item.category}</Text>
+          <Text style={[s.typeLabel, { color: meta.color }]}>
+            {item.category ?? meta.label}
+          </Text>
           <Text style={s.sep}> · </Text>
-          <Text style={s.time}>{item.time}</Text>
+          <Text style={s.time}>{relativeTime(item.receivedAt)}</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 };
+
+// ─── Topic toggle ────────────────────────────────────────────────
 
 const makeTopicStyle = (C: ThemeColors) => StyleSheet.create({
   row: {
@@ -186,6 +183,8 @@ const TopicRow: React.FC<{ topic: TopicData; enabled: boolean; onToggle: () => v
   );
 };
 
+// ─── Styles globaux ───────────────────────────────────────────────
+
 const makeStyles = (C: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: C.background },
   header: {
@@ -231,8 +230,9 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     paddingTop: Spacing['5'],
     paddingBottom: Spacing['2'],
   },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: Spacing['3'] },
+  empty: { flex: 1, alignItems: 'center', paddingTop: 80, gap: Spacing['3'] },
   emptyTitle: { fontFamily: FontFamily.bodyBold, fontSize: FontSize.base, color: C.textMuted },
+  emptySub: { fontFamily: FontFamily.body, fontSize: FontSize.sm, color: C.textDisabled, textAlign: 'center', paddingHorizontal: 32 },
 });
 
 // ─── Écran principal ──────────────────────────────────────────────
@@ -240,6 +240,7 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   onBack,
   onArticlePress,
+  onMagazinePress,
   onUnreadChange,
 }) => {
   const insets = useSafeAreaInsets();
@@ -247,60 +248,56 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   const styles = makeStyles(colors);
 
   const [tab, setTab] = useState<Tab>('alerts');
-  const [items, setItems] = useState<NotifItem[]>([]);
+  const [items, setItems] = useState<StoredNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [enabledTopics, setEnabledTopics] = useState<Set<string>>(
     new Set(['breaking', 'actualites', 'vaccination'])
   );
 
-  const loadNotifications = useCallback(async () => {
+  useEffect(() => {
+    AsyncStorage.getItem('notification_topics').then((raw) => {
+      if (raw) setEnabledTopics(new Set(JSON.parse(raw) as string[]));
+    });
+  }, []);
+
+  const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetchArticles(1);
-    const articles = res?.data ?? [];
-
-    const mapped: NotifItem[] = await Promise.all(
-      articles.slice(0, 20).map(async (a) => ({
-        id: String(a.id),
-        title: a.title,
-        time: relativeTime(a.published_at),
-        category: a.category?.name ?? a.category_name ?? 'Actualités',
-        read: await isRead(String(a.id)),
-        icon: iconForCategory(a.category?.slug ?? ''),
-      }))
-    );
-
-    setItems(mapped);
-    const unread = mapped.filter((n) => !n.read).length;
-    onUnreadChange?.(unread);
+    const notifs = await getStoredNotifications();
+    setItems(notifs);
+    onUnreadChange?.(countUnread(notifs));
     setLoading(false);
   }, [onUnreadChange]);
 
-  useEffect(() => { loadNotifications(); }, [loadNotifications]);
+  useEffect(() => { void load(); }, [load]);
 
   const handleMarkAllRead = async () => {
-    await markAllRead(items.map((i) => i.id));
-    setItems((prev) => prev.map((i) => ({ ...i, read: true })));
+    await markAllStoredRead();
+    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
     onUnreadChange?.(0);
   };
 
-  const handleItemPress = async (item: NotifItem) => {
+  const handleItemPress = async (item: StoredNotification) => {
     if (!item.read) {
-      await markAllRead([item.id]);
-      setItems((prev) => prev.map((n) => n.id === item.id ? { ...n, read: true } : n));
-      const newUnread = items.filter((n) => !n.read && n.id !== item.id).length;
-      onUnreadChange?.(newUnread);
+      const updated = await markStoredRead(item.id);
+      setItems(updated);
+      onUnreadChange?.(countUnread(updated));
     }
-    onArticlePress?.(item.id);
+    if (item.type === 'article' && item.articleId) {
+      onArticlePress?.(item.articleId);
+    } else if (item.type === 'magazine') {
+      onMagazinePress?.();
+    }
   };
 
   const toggleTopic = (id: string) =>
     setEnabledTopics((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
+      AsyncStorage.setItem('notification_topics', JSON.stringify([...next]));
       return next;
     });
 
-  const unreadCount = items.filter((n) => !n.read).length;
+  const unreadCount = countUnread(items);
 
   return (
     <View style={styles.container}>
@@ -349,8 +346,11 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.empty}>
-                <Feather name="bell" size={48} color={colors.textDisabled} />
+                <Feather name="bell-off" size={48} color={colors.textDisabled} />
                 <Text style={styles.emptyTitle}>Aucune notification</Text>
+                <Text style={styles.emptySub}>
+                  Vous recevrez des alertes dès qu'un article est publié ou que votre abonnement approche de son expiration.
+                </Text>
               </View>
             }
           />

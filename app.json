@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./src/assets/logo-SA.png",
     "userInterfaceStyle": "light",
+    "scheme": "santeafrique",
     "splash": {
       "image": "./src/assets/logo2.png",
       "backgroundColor": "#1B9DD9",
@@ -13,7 +14,13 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "net.santeafrique.app"
+      "bundleIdentifier": "net.santeafrique.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSUserNotificationUsageDescription": "Santé Afrique vous envoie des alertes pour les articles importants et les dernières actualités santé.",
+        "CFBundleLocalizations": ["fr"],
+        "CFBundleDevelopmentRegion": "fr"
+      }
     },
     "android": {
       "icon": "./src/assets/icon-blue.png",
@@ -21,10 +28,14 @@
         "foregroundImage": "./src/assets/icon-blue.png",
         "backgroundColor": "#1B9DD9"
       },
-      "package": "net.santeafrique.app"
-    },
-    "web": {
-      "bundler": "metro"
+      "package": "net.santeafrique.app",
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "plugins": [
       "expo-font",
@@ -38,6 +49,12 @@
       ],
       "expo-asset"
     ],
+    "updates": {
+      "url": "https://u.expo.dev/2fd4ad64-9845-403b-a1f1-fafa0945f0c5"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "extra": {
       "eas": {
         "projectId": "2fd4ad64-9845-403b-a1f1-fafa0945f0c5"

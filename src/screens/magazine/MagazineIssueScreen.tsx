@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   StyleSheet,
   StatusBar,
   Dimensions,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,7 +18,7 @@ import { Colors, FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
 import type { MagazineIssue } from './MagazineScreen';
-import { fetchMagazineIssueDetail } from '@/services/api';
+import { fetchMagazineIssueDetail, fetchMagazineReaderUrl } from '@/services/api';
 import type { ApiMagazineSommaireItem } from '@/services/api';
 
 interface MagazineIssueScreenProps {
@@ -24,6 +26,9 @@ interface MagazineIssueScreenProps {
   onBack?: () => void;
   onSubscribe?: () => void;
   onLogin?: () => void;
+  onRead?: (url: string, pdfUrl: string | null) => void;
+  isLoggedIn?: boolean;
+  isSubscriber?: boolean;
 }
 
 const { width: W } = Dimensions.get('window');
@@ -268,6 +273,9 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
   onBack,
   onSubscribe,
   onLogin,
+  onRead,
+  isLoggedIn = false,
+  isSubscriber = false,
 }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -275,14 +283,35 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
   const [sommaire, setSommaire] = useState<ApiMagazineSommaireItem[]>(SOMMAIRE_FALLBACK);
   const [extrait, setExtrait] = useState<string | null>(null);
   const [detailDate, setDetailDate] = useState<string | undefined>(issue.publishedAt);
+  const [readUrl, setReadUrl] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [isLoadingReader, setIsLoadingReader] = useState(false);
 
   useEffect(() => {
     fetchMagazineIssueDetail(Number(issue.id)).then((detail) => {
       if (detail?.sommaire?.length) setSommaire(detail.sommaire);
       if (detail?.extrait) setExtrait(detail.extrait);
       if (detail?.date) setDetailDate(detail.date);
+      if (detail?.read_url) setReadUrl(detail.read_url);
+      if (detail?.pdf_url) setPdfUrl(detail.pdf_url);
     });
   }, [issue.id]);
+
+  const handleRead = useCallback(async () => {
+    setIsLoadingReader(true);
+    try {
+      // Tente d'obtenir une URL de lecture authentifiée via le backend
+      const authenticatedUrl = await fetchMagazineReaderUrl(Number(issue.id));
+      const url = authenticatedUrl ?? pdfUrl ?? readUrl;
+      if (url) {
+        onRead?.(url, null);
+      } else {
+        Alert.alert('Indisponible', 'La lecture de ce numéro n\'est pas encore disponible dans l\'application.');
+      }
+    } finally {
+      setIsLoadingReader(false);
+    }
+  }, [issue.id, pdfUrl, readUrl, onRead]);
 
   const visibleItems = sommaire;
   const hiddenCount  = 0;
@@ -347,17 +376,34 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
             </View>
           </View>
 
-          {/* 3 boutons : SOMMAIRE | LIRE (ABONNÉS) | SE CONNECTER */}
+          {/* 3 boutons : SOMMAIRE | LIRE | SE CONNECTER / MON COMPTE */}
           <View style={styles.btnRow}>
             <TouchableOpacity style={styles.btnSommaire} activeOpacity={0.8}>
               <Text style={styles.btnSommaireText}>Sommaire</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.btnLire} onPress={onSubscribe} activeOpacity={0.85}>
-              <Text style={styles.btnLireText}>{'Lire\n(Abonnés)'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.btnConnect} onPress={onLogin} activeOpacity={0.85}>
-              <Text style={styles.btnConnectText}>Se connecter</Text>
-            </TouchableOpacity>
+
+            {isSubscriber ? (
+              <TouchableOpacity style={styles.btnLire} onPress={handleRead} activeOpacity={0.85} disabled={isLoadingReader}>
+                {isLoadingReader
+                  ? <ActivityIndicator size="small" color={colors.white} />
+                  : <Text style={styles.btnLireText}>Lire</Text>
+                }
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.btnLire} onPress={onSubscribe} activeOpacity={0.85}>
+                <Text style={styles.btnLireText}>{'S\'abonner'}</Text>
+              </TouchableOpacity>
+            )}
+
+            {!isLoggedIn ? (
+              <TouchableOpacity style={styles.btnConnect} onPress={onLogin} activeOpacity={0.85}>
+                <Text style={styles.btnConnectText}>Se connecter</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={[styles.btnConnect, { backgroundColor: '#1B4F72' }]} onPress={onLogin} activeOpacity={0.85}>
+                <Text style={styles.btnConnectText}>Mon compte</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
         </LinearGradient>

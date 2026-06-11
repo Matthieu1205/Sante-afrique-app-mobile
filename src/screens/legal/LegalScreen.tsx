@@ -18,6 +18,7 @@ interface LegalScreenProps {
   url: string;
   onBack: () => void;
   hideChrome?: boolean;
+  authToken?: string | null;
   onLoginSuccess?: () => void;
 }
 
@@ -30,7 +31,7 @@ const HIDE_CHROME_JS = `
 true;
 `;
 
-export const LegalScreen: React.FC<LegalScreenProps> = ({ title, url, onBack, hideChrome = false, onLoginSuccess }) => {
+export const LegalScreen: React.FC<LegalScreenProps> = ({ title, url, onBack, hideChrome = false, authToken, onLoginSuccess }) => {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
@@ -59,7 +60,10 @@ export const LegalScreen: React.FC<LegalScreenProps> = ({ title, url, onBack, hi
       )}
 
       <WebView
-        source={{ uri: url }}
+        source={{
+          uri: url,
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+        }}
         style={{ flex: 1, opacity: loading ? 0 : 1 }}
         injectedJavaScript={hideChrome ? HIDE_CHROME_JS : undefined}
         onLoadEnd={() => setLoading(false)}

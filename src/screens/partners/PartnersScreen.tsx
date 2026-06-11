@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, StatusBar, Linking, ActivityIndicator,
@@ -14,6 +14,7 @@ import { Platform } from 'react-native';
 import { FontFamily, FontSize, Spacing, Radius, Shadows } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { ThemeColors } from '@/contexts/ThemeContext';
+import { fetchPartners } from '@/services/api';
 
 const KIT_PDF = require('../../assets/MbJv5u8JpG6MGak14NHFYhKLsJW0OIveLzuBDLKr.pdf') as number;
 
@@ -35,28 +36,12 @@ const VALUE_CARDS = [
   },
 ];
 
-const PARTNERS = [
-  'Ministère Santé CI',
-  'MEPS',
-  'AIRP',
-  'ONP-CI',
-  'Ordre Med. CI',
-  'PNSM',
-  'CNPTIR',
-  'IMENA',
-  'CNRAO',
-  'CNTS-CI',
-  'UNPPCI',
-  'Labo Montagnier',
-  'CAMU',
-  'oumed',
-  'UFR SPB',
-  'ONCDCI',
-  'ONE-CI',
-  'PSPCI',
-  'CNAM',
-  'INSP',
-  'Laboratoires A',
+const PARTNERS_FALLBACK = [
+  'Ministère Santé CI', 'MEPS', 'AIRP', 'ONP-CI',
+  'Ordre Med. CI', 'PNSM', 'CNPTIR', 'IMENA',
+  'CNRAO', 'CNTS-CI', 'UNPPCI', 'Labo Montagnier',
+  'CAMU', 'oumed', 'UFR SPB', 'ONCDCI',
+  'ONE-CI', 'PSPCI', 'CNAM', 'INSP', 'Laboratoires A',
 ];
 
 const makeStyles = (C: ThemeColors) => StyleSheet.create({
@@ -250,6 +235,11 @@ export const PartnersScreen: React.FC<Props> = ({ onBack }) => {
   const styles = makeStyles(colors);
   const insets = useSafeAreaInsets();
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [partners, setPartners] = useState<string[]>(PARTNERS_FALLBACK);
+
+  useEffect(() => {
+    fetchPartners().then((data) => { if (data.length > 0) setPartners(data); });
+  }, []);
 
   const openKitMedia = async () => {
     if (pdfLoading) return;
@@ -360,7 +350,7 @@ export const PartnersScreen: React.FC<Props> = ({ onBack }) => {
         <View style={styles.partnersSection}>
           <Text style={styles.sectionTitle}>Ils nous font confiance</Text>
           <View style={styles.partnersGrid}>
-            {PARTNERS.map((name) => (
+            {partners.map((name) => (
               <View key={name} style={styles.partnerChip}>
                 <Text style={styles.partnerName}>{name}</Text>
               </View>
