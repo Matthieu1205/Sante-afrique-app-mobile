@@ -54,10 +54,16 @@ export async function requestPushPermissions(): Promise<string | null> {
   if (finalStatus !== 'granted') return null;
 
   if (Platform.OS === 'android') {
+    // Supprime l'ancien canal (Android met en cache les paramètres)
+    // pour forcer la recréation avec le son activé
+    await Notifications.deleteNotificationChannelAsync('default').catch(() => {});
     await Notifications.setNotificationChannelAsync('default', {
       name: 'Santé Afrique',
       importance: Notifications.AndroidImportance.MAX,
+      sound: 'default',
       vibrationPattern: [0, 250, 250, 250],
+      enableVibrate: true,
+      enableLights: true,
       lightColor: '#1B9DD9',
     });
   }
@@ -170,9 +176,10 @@ export async function checkAndNotifySubscriptionExpiry(expiresAt: string): Promi
       content: {
         title: 'Abonnement expirant bientôt',
         body: `Votre abonnement expire dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}.`,
+        sound: 'default',
         data: { type: 'subscription' },
       },
-      trigger: null, // affiche immédiatement
+      trigger: null,
     }).catch(() => {});
   }
 

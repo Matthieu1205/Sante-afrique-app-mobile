@@ -413,6 +413,93 @@ WHERE read_url IS NULL;
 
 ---
 
+## 9. Notifications push — Son obligatoire
+
+> ⚠️ Les notifications arrivent sur le téléphone mais **sans son** si ces deux points ne sont pas respectés.
+
+### 9.1 Endpoint enregistrement du token (si pas encore implémenté)
+
+L'app envoie le token Expo push au démarrage. Sans cet endpoint, le serveur ne sait pas à qui envoyer les notifications.
+
+**`routes/api.php`**
+```php
+// Public — envoyé avant même que l'utilisateur soit connecté
+Route::post('/push-token', [NotificationController::class, 'store']);
+```
+
+**`app/Http/Controllers/NotificationController.php`**
+```php
+public function store(Request $request)
+{
+    $request->validate([
+        'token'    => 'required|string',
+        'platform' => 'nullable|in:ios,android',
+        'device'   => 'nullable|string',
+    ]);
+
+    PushToken::updateOrCreate(
+        ['token' => $request->token],
+        [
+            'platform'   => $request->platform,
+            'device'     => $request->device,
+            'user_id'    => $request->user()?->id,
+            'updated_at' => now(),
+        ]
+    );
+
+    return response()->json(['ok' => true]);
+}
+```
+
+**Format envoyé par l'app :**
+```json
+{
+  "token": "ExponentPushToken[xxxxxx]",
+  "platform": "android",
+  "device": "Samsung Galaxy S23"
+}
+```
+
+---
+
+### 9.2 Payload de la notification — inclure `sound`
+
+Quand le backend envoie une notification via l'API Expo (nouvel article, nouveau magazine), le champ `"sound": "default"` est **obligatoire** pour que le téléphone sonne.
+
+**Payload à envoyer à `https://exp.host/--/api/v2/push/send` :**
+
+```json
+{
+  "to": "ExponentPushToken[xxxxxx]",
+  "title": "Nouvel article",
+  "body": "Découvrez notre dernier article sur la santé maternelle.",
+  "sound": "default",
+  "data": {
+    "type": "article",
+    "article_id": "42"
+  }
+}
+```
+
+**Pour un nouveau magazine :**
+```json
+{
+  "to": "ExponentPushToken[xxxxxx]",
+  "title": "Nouveau magazine disponible",
+  "body": "Le numéro 24 de Santé Afrique est en ligne.",
+  "sound": "default",
+  "data": {
+    "type": "magazine"
+  }
+}
+```
+
+> Le champ `"type"` dans `data` est utilisé par l'app pour la navigation :
+> - `"article"` + `"article_id"` → ouvre l'article directement
+> - `"magazine"` → ouvre l'écran magazine
+
+---
+
 ## Test via Tinker
 
 ```bash
