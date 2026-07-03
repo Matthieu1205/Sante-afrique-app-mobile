@@ -10,7 +10,7 @@ import {
   getLastNotificationArticleId,
   getPushToken,
 } from './src/services/notifications';
-import { getAuthToken, logoutUser, fetchUserProfile, fetchMagazineReaderUrl, PROFILE_UNAUTHORIZED } from './src/services/api';
+import { getAuthToken, logoutUser, fetchUserProfile, fetchMagazineReaderUrl, fetchMagazineIssueDetail, PROFILE_UNAUTHORIZED } from './src/services/api';
 import type { UserProfile } from './src/services/api';
 import { Feather } from '@expo/vector-icons';
 
@@ -231,7 +231,15 @@ function AppContent() {
     if (isLoggedIn && isSubscribed) {
       setIsOpeningReader(true);
       try {
-        const url = await fetchMagazineReaderUrl(Number(issue.id));
+        // 1. Essaie l'URL signée authentifiée
+        let url = await fetchMagazineReaderUrl(Number(issue.id));
+
+        // 2. Fallback : read_url ou pdf_url depuis le détail de l'issue
+        if (!url) {
+          const detail = await fetchMagazineIssueDetail(Number(issue.id));
+          url = detail?.read_url ?? detail?.pdf_url ?? null;
+        }
+
         if (url) {
           go('legal', {
             legalTitle: `Santé Afrique N°${issue.number}`,
