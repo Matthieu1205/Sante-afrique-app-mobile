@@ -29,6 +29,7 @@ interface MagazineIssueScreenProps {
   onRead?: (url: string, pdfUrl: string | null) => void;
   isLoggedIn?: boolean;
   isSubscriber?: boolean;
+  autoRead?: boolean;
 }
 
 const { width: W } = Dimensions.get('window');
@@ -276,6 +277,7 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
   onRead,
   isLoggedIn = false,
   isSubscriber = false,
+  autoRead = false,
 }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -296,6 +298,13 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
       if (detail?.pdf_url) setPdfUrl(detail.pdf_url);
     });
   }, [issue.id]);
+
+  // Lecture automatique si abonné (bypass de l'écran intermédiaire)
+  useEffect(() => {
+    if (autoRead && isSubscriber) {
+      handleRead();
+    }
+  }, [autoRead, isSubscriber]);
 
   const handleRead = useCallback(async () => {
     setIsLoadingReader(true);
