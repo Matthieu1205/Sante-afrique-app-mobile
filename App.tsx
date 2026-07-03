@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, AppState } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, AppState, ActivityIndicator } from 'react-native';
 import {
   requestPushPermissions,
   sendPushTokenToServer,
@@ -546,7 +546,16 @@ function AppContent() {
         );
 
       case 'profile':
-        return userProfile ? (
+        if (!userProfile) {
+          // Profil pas encore chargé : on relance le fetch et on affiche un loader
+          fetchUserProfile().then((p) => { if (p) setUserProfile(p); });
+          return (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
+              <ActivityIndicator size="large" color="#1B9DD9" />
+            </View>
+          );
+        }
+        return (
           <ProfileScreen
             userProfile={userProfile}
             onBack={() => go('menu')}
@@ -558,7 +567,7 @@ function AppContent() {
             onLogout={handleLogout}
             onProfileUpdated={(name) => setUserProfile((p) => p ? { ...p, name } : p)}
           />
-        ) : null;
+        );
 
       case 'history':
         return (
