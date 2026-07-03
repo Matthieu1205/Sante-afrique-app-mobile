@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, AppState, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, AppState, ActivityIndicator, Platform } from 'react-native';
 import {
   requestPushPermissions,
   sendPushTokenToServer,
@@ -541,12 +541,17 @@ function AppContent() {
             onBack={() => go('magazine')}
             onSubscribe={() => go('subscription')}
             onLogin={() => isLoggedIn ? go('profile') : go('login')}
-            onRead={(url) => go('legal', {
-              legalTitle: `Santé Afrique N°${params.issue!.number}`,
-              legalUrl: url,
-              legalHideChrome: true,
-              legalRequiresAuth: true,
-            })}
+            onRead={(url) => {
+              const viewerUrl = Platform.OS === 'android'
+                ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`
+                : url;
+              go('legal', {
+                legalTitle: `Santé Afrique N°${params.issue!.number}`,
+                legalUrl: viewerUrl,
+                legalHideChrome: true,
+                legalRequiresAuth: false,
+              });
+            }}
           />
         ) : null;
       }
