@@ -33,7 +33,7 @@ interface MagazineIssueScreenProps {
 }
 
 const { width: W } = Dimensions.get('window');
-const COVER_W = (W - Spacing['4'] * 2) * 0.42;
+const COVER_W = (W - Spacing['4'] * 2) * 0.58;
 const COVER_H = COVER_W * 1.42;
 const JOURS_FR = ['DIMANCHE', 'LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
 const MOIS_FR  = ['JANVIER','FÉVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOÛT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DÉCEMBRE'];
@@ -78,44 +78,40 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
   content: { paddingBottom: 48 },
 
   // ── Hero ─────────────────────────────────────────────────────────
-  hero: { padding: Spacing['4'], paddingBottom: Spacing['5'] },
-  heroInner: { flexDirection: 'row', gap: Spacing['4'], alignItems: 'flex-start' },
+  hero: { paddingHorizontal: Spacing['4'], paddingTop: Spacing['4'], paddingBottom: Spacing['5'], alignItems: 'center' },
 
-  cover: {
-    borderRadius: Radius.sm,
-    overflow: 'hidden',
-    ...Shadows.card,
-  },
+  coverWrap: { alignItems: 'center', marginBottom: Spacing['4'], ...Shadows.card },
   coverNumBadge: {
     position: 'absolute', top: 8, left: 8,
     backgroundColor: 'rgba(255,255,255,0.25)',
     borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2,
   },
   coverNumText: { fontFamily: FontFamily.bodyBold, fontSize: 9, color: C.white },
-  coverLogoWrap: { position: 'absolute', bottom: 8 },
-  coverLogo: { fontFamily: FontFamily.logo, fontSize: 10, color: 'rgba(255,255,255,0.75)' },
 
-  // méta (droite de la couverture)
-  meta: { flex: 1, gap: 6, paddingTop: 4 },
   metaBadge: {
     fontFamily: FontFamily.bodyBold,
     fontSize: 10,
     color: 'rgba(255,255,255,0.55)',
     letterSpacing: 1.8,
     textTransform: 'uppercase',
+    alignSelf: 'flex-start',
+    marginBottom: 4,
   },
   metaTitle: {
     fontFamily: FontFamily.headingBold,
-    fontSize: 30,
+    fontSize: 28,
     color: C.white,
     lineHeight: 32,
     letterSpacing: -0.5,
+    alignSelf: 'flex-start',
   },
   metaNum: {
     fontFamily: FontFamily.bodySemiBold,
     fontSize: FontSize.sm,
     color: 'rgba(255,255,255,0.75)',
     letterSpacing: 0.3,
+    alignSelf: 'flex-start',
+    marginBottom: 2,
   },
   metaDate: {
     fontFamily: FontFamily.bodyBold,
@@ -123,72 +119,48 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     color: 'rgba(255,255,255,0.55)',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
-    marginTop: 2,
-  },
-  metaTheme: {
-    fontFamily: FontFamily.body,
-    fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.55)',
-    lineHeight: 17,
-    marginTop: 4,
+    alignSelf: 'flex-start',
+    marginBottom: Spacing['4'],
   },
 
-  // ── 3 boutons en ligne ───────────────────────────────────────────
-  btnRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: Spacing['4'],
-  },
-  // SOMMAIRE — outline blanc sur fond sombre
-  btnSommaire: {
-    flex: 1,
-    paddingVertical: 11,
-    borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.55)',
-  },
-  btnSommaireText: {
-    fontFamily: FontFamily.bodyBold,
-    fontSize: 10,
-    color: C.white,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  // LIRE (ABONNÉS) — bleu plein
-  btnLire: {
-    flex: 1,
-    paddingVertical: 11,
+  // LIRE (ABONNÉS) — pleine largeur
+  btnLireFull: {
+    width: '100%',
+    paddingVertical: 14,
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: C.primary,
+    marginBottom: 10,
   },
-  btnLireText: {
+  btnLireFullLocked: { opacity: 0.7 },
+  btnLireFullText: {
     fontFamily: FontFamily.bodyBold,
-    fontSize: 10,
+    fontSize: 12,
     color: C.white,
-    letterSpacing: 0.8,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
-    textAlign: 'center',
   },
-  // SE CONNECTER — rouge plein
+
+  // S'ABONNER + SE CONNECTER en ligne
+  btnRow: { flexDirection: 'row', gap: 8, width: '100%' },
+  btnSabonner: {
+    flex: 1, paddingVertical: 12, borderRadius: 4,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)',
+  },
+  btnSabonnerText: {
+    fontFamily: FontFamily.bodyBold, fontSize: 10,
+    color: C.white, letterSpacing: 1, textTransform: 'uppercase',
+  },
   btnConnect: {
-    flex: 1,
-    paddingVertical: 11,
-    borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
+    flex: 1, paddingVertical: 12, borderRadius: 4,
+    alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#C0392B',
   },
   btnConnectText: {
-    fontFamily: FontFamily.bodyBold,
-    fontSize: 10,
-    color: C.white,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    textAlign: 'center',
+    fontFamily: FontFamily.bodyBold, fontSize: 10,
+    color: C.white, letterSpacing: 1, textTransform: 'uppercase',
   },
 
   // ── Extrait ──────────────────────────────────────────────────────
@@ -299,13 +271,6 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
     });
   }, [issue.id]);
 
-  // Lecture automatique si abonné (bypass de l'écran intermédiaire)
-  useEffect(() => {
-    if (autoRead && isSubscriber) {
-      handleRead();
-    }
-  }, [autoRead, isSubscriber]);
-
   const handleRead = useCallback(async () => {
     setIsLoadingReader(true);
     try {
@@ -349,70 +314,53 @@ export const MagazineIssueScreen: React.FC<MagazineIssueScreenProps> = ({
         {/* ── Hero foncé ─────────────────────────────────────────── */}
         <LinearGradient colors={HERO_BG} style={styles.hero}>
 
-          <View style={styles.heroInner}>
-            {/* Couverture */}
+          {/* Couverture centrée */}
+          <View style={styles.coverWrap}>
             {issue.coverImage ? (
-              <View style={[styles.cover, { width: COVER_W, height: COVER_H }]}>
-                <Image source={issue.coverImage} style={{ width: COVER_W, height: COVER_H }} resizeMode="cover" />
-              </View>
+              <Image source={issue.coverImage} style={{ width: COVER_W, height: COVER_H, borderRadius: Radius.sm }} resizeMode="cover" />
             ) : (
               <LinearGradient
                 colors={issue.color}
-                style={[styles.cover, { width: COVER_W, height: COVER_H, alignItems: 'center', justifyContent: 'center' }]}
+                style={{ width: COVER_W, height: COVER_H, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' }}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               >
                 <View style={styles.coverNumBadge}>
                   <Text style={styles.coverNumText}>N°{issue.number}</Text>
                 </View>
                 <Feather name={issue.icon} size={38} color="rgba(255,255,255,0.85)" />
-                <View style={styles.coverLogoWrap}>
-                  <Text style={styles.coverLogo}>santé <Text style={{ color: colors.white }}>afrique</Text></Text>
-                </View>
               </LinearGradient>
             )}
-
-            {/* Méta */}
-            <View style={styles.meta}>
-              <Text style={styles.metaBadge}>Numéro en cours</Text>
-              <Text style={styles.metaTitle}>Santé Afrique</Text>
-              <Text style={styles.metaNum}>{issue.label}</Text>
-              {dateFormatted ? (
-                <Text style={styles.metaDate}>{dateFormatted}</Text>
-              ) : null}
-              {issue.theme ? (
-                <Text style={styles.metaTheme}>{issue.theme}</Text>
-              ) : null}
-            </View>
           </View>
 
-          {/* 3 boutons : SOMMAIRE | LIRE | SE CONNECTER / MON COMPTE */}
+          {/* Méta centré */}
+          <Text style={styles.metaBadge}>Sommaire</Text>
+          <Text style={styles.metaTitle}>Santé Afrique</Text>
+          <Text style={styles.metaNum}>{issue.label.replace('•', '—')}</Text>
+          {dateFormatted ? <Text style={styles.metaDate}>{dateFormatted}</Text> : null}
+
+          {/* Bouton LIRE (ABONNÉS) — pleine largeur */}
+          <TouchableOpacity
+            style={[styles.btnLireFull, !isSubscriber && styles.btnLireFullLocked]}
+            onPress={isSubscriber ? handleRead : onSubscribe}
+            activeOpacity={0.85}
+            disabled={isLoadingReader}
+          >
+            {isLoadingReader
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Text style={styles.btnLireFullText}>
+                  {isSubscriber ? 'Lire (abonnés)' : 'Lire (abonnés)'}
+                </Text>
+            }
+          </TouchableOpacity>
+
+          {/* S'ABONNER + SE CONNECTER */}
           <View style={styles.btnRow}>
-            <TouchableOpacity style={styles.btnSommaire} activeOpacity={0.8}>
-              <Text style={styles.btnSommaireText}>Sommaire</Text>
+            <TouchableOpacity style={styles.btnSabonner} onPress={onSubscribe} activeOpacity={0.85}>
+              <Text style={styles.btnSabonnerText}>S'abonner</Text>
             </TouchableOpacity>
-
-            {isSubscriber ? (
-              <TouchableOpacity style={styles.btnLire} onPress={handleRead} activeOpacity={0.85} disabled={isLoadingReader}>
-                {isLoadingReader
-                  ? <ActivityIndicator size="small" color={colors.white} />
-                  : <Text style={styles.btnLireText}>Lire</Text>
-                }
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.btnLire} onPress={onSubscribe} activeOpacity={0.85}>
-                <Text style={styles.btnLireText}>{'S\'abonner'}</Text>
-              </TouchableOpacity>
-            )}
-
-            {!isLoggedIn ? (
-              <TouchableOpacity style={styles.btnConnect} onPress={onLogin} activeOpacity={0.85}>
-                <Text style={styles.btnConnectText}>Se connecter</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={[styles.btnConnect, { backgroundColor: '#1B4F72' }]} onPress={onLogin} activeOpacity={0.85}>
-                <Text style={styles.btnConnectText}>Mon compte</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={styles.btnConnect} onPress={onLogin} activeOpacity={0.85}>
+              <Text style={styles.btnConnectText}>{isLoggedIn ? 'Mon compte' : 'Se connecter'}</Text>
+            </TouchableOpacity>
           </View>
 
         </LinearGradient>

@@ -531,7 +531,6 @@ function AppContent() {
             issue={params.issue}
             isLoggedIn={isLoggedIn}
             isSubscriber={userProfile?.subscription?.is_active ?? false}
-            autoRead={userProfile?.subscription?.is_active ?? false}
             onBack={() => go('magazine')}
             onSubscribe={() => go('subscription')}
             onLogin={() => isLoggedIn ? go('profile') : go('login')}
