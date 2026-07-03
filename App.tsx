@@ -10,7 +10,7 @@ import {
   getLastNotificationArticleId,
   getPushToken,
 } from './src/services/notifications';
-import { getAuthToken, logoutUser, fetchUserProfile, PROFILE_UNAUTHORIZED } from './src/services/api';
+import { getAuthToken, logoutUser, fetchUserProfile, fetchMagazineReaderUrl, PROFILE_UNAUTHORIZED } from './src/services/api';
 import type { UserProfile } from './src/services/api';
 import { Feather } from '@expo/vector-icons';
 
@@ -198,6 +198,7 @@ function AppContent() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
+  const [isOpeningReader, setIsOpeningReader] = useState(false);
 
   const go = (screen: Screen, params?: NavState['params']) =>
     setNav({ screen, params });
@@ -224,6 +225,28 @@ function AppContent() {
   const refreshProfile = useCallback(() => {
     getAuthToken().then((t) => { if (t) loadProfile(); });
   }, [loadProfile]);
+
+  const handleIssuePress = useCallback(async (issue: MagazineIssue) => {
+    const isSubscribed = userProfile?.subscription?.is_active ?? false;
+    if (isLoggedIn && isSubscribed) {
+      setIsOpeningReader(true);
+      try {
+        const url = await fetchMagazineReaderUrl(Number(issue.id));
+        if (url) {
+          go('legal', {
+            legalTitle: `Santé Afrique N°${issue.number}`,
+            legalUrl: url,
+            legalHideChrome: true,
+            legalRequiresAuth: true,
+          });
+          return;
+        }
+      } finally {
+        setIsOpeningReader(false);
+      }
+    }
+    go('magazine-issue', { issue });
+  }, [isLoggedIn, userProfile]);
 
   // Vérifie l'expiration de l'abonnement à chaque chargement du profil
   useEffect(() => {
@@ -365,7 +388,7 @@ function AppContent() {
             onLegal={() => go('mentions-legales')}
             onPrivacy={() => go('legal', { legalTitle: 'Politique de confidentialité', legalUrl: 'https://santeafrique.net/politique-de-confidentialite', legalHideChrome: true })}
             onConsent={() => go('legal', { legalTitle: 'Consentements', legalUrl: 'https://santeafrique.net/consentements', legalHideChrome: true })}
-            onIssuePress={(issue) => go('magazine-issue', { issue })}
+            onIssuePress={handleIssuePress}
           />
         );
 
@@ -517,15 +540,6 @@ function AppContent() {
         );
 
       case 'magazine-issue': {
-        // Si connecté mais profil pas encore chargé → attendre avant de juger l'abonnement
-        if (isLoggedIn && !userProfile) {
-          loadProfile();
-          return (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
-              <ActivityIndicator size="large" color="#1B9DD9" />
-            </View>
-          );
-        }
         return params?.issue ? (
           <MagazineIssueScreen
             issue={params.issue}
@@ -683,6 +697,14 @@ function AppContent() {
           onPress={(s) => go(s)}
         />
       )}
+      {isOpeningReader && (
+        <View style={styles.readerOverlay}>
+          <View style={styles.readerOverlayCard}>
+            <ActivityIndicator size="large" color="#1B9DD9" />
+            <Text style={styles.readerOverlayText}>Ouverture du magazine…</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -700,4 +722,17 @@ export default function App() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
+  readerOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  readerOverlayCard: {
+    backgroundColor: '#fff', borderRadius: 12,
+    paddingHorizontal: 32, paddingVertical: 24,
+    alignItems: 'center', gap: 14,
+  },
+  readerOverlayText: {
+    fontSize: 14, color: '#374151', fontFamily: 'Inter_400Regular',
+  },
 });
