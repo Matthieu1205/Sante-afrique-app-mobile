@@ -11,7 +11,6 @@ import {
   getPushToken,
 } from './src/services/notifications';
 import { getAuthToken, logoutUser, fetchUserProfile, fetchMagazineReaderUrl, fetchMagazineIssueDetail, PROFILE_UNAUTHORIZED } from './src/services/api';
-import { openMagazinePdf } from './src/utils/openPdf';
 import type { UserProfile } from './src/services/api';
 import { Feather } from '@expo/vector-icons';
 
@@ -50,6 +49,7 @@ import { SettingsScreen } from './src/screens/settings/SettingsScreen';
 import { MagazineScreen } from './src/screens/magazine/MagazineScreen';
 import type { MagazineIssue } from './src/screens/magazine/MagazineScreen';
 import { MagazineIssueScreen } from './src/screens/magazine/MagazineIssueScreen';
+import { MagazinePdfScreen } from './src/screens/magazine/MagazinePdfScreen';
 import { AboutScreen } from './src/screens/about/AboutScreen';
 import { SubscriptionScreen } from './src/screens/subscription/SubscriptionScreen';
 import { MonAbonnementScreen } from './src/screens/subscription/MonAbonnementScreen';
@@ -94,7 +94,8 @@ type Screen =
   | 'history'
   | 'factures'
   | 'mon-abonnement'
-  | 'mentions-legales';
+  | 'mentions-legales'
+  | 'magazine-pdf';
 
 interface NavState {
   screen: Screen;
@@ -108,6 +109,8 @@ interface NavState {
     legalUrl?: string;
     legalHideChrome?: boolean;
     legalRequiresAuth?: boolean;
+    pdfUrl?: string;
+    pdfTitle?: string;
   };
 }
 
@@ -247,21 +250,18 @@ function AppContent() {
         const pdfUrl  = detail?.pdf_url  ?? null;
         const readUrl = detail?.read_url ?? null;
 
-        if (readerUrl) {
-          // reader-url = toujours une URL de lecture PDF (signée ou directe)
-          // → téléchargement + ouverture native, quelle que soit l'extension
-          await openMagazinePdf(readerUrl, authToken);
-          return;
-        }
-
-        if (pdfUrl) {
-          // Fichier PDF direct depuis le détail
-          await openMagazinePdf(pdfUrl, authToken);
+        const finalUrl = readerUrl ?? pdfUrl ?? null;
+        if (finalUrl) {
+          // Lecteur PDF intégré
+          go('magazine-pdf', {
+            pdfUrl: finalUrl,
+            pdfTitle: `Santé Afrique N°${issue.number}`,
+          });
           return;
         }
 
         if (readUrl) {
-          // Page web du magazine → WebView (pas de Bearer, le site gère sa propre auth)
+          // Fallback : page web du magazine
           go('legal', {
             legalTitle: `Santé Afrique N°${issue.number}`,
             legalUrl: readUrl,
@@ -696,6 +696,16 @@ function AppContent() {
             onBack={() => go(nav.params?.fromScreen ?? 'menu')}
             onModifier={() => go('subscription')}
             onFactures={() => go('factures')}
+          />
+        ) : null;
+
+      case 'magazine-pdf':
+        return params?.pdfUrl ? (
+          <MagazinePdfScreen
+            url={params.pdfUrl}
+            title={params.pdfTitle ?? 'Magazine'}
+            authToken={authToken}
+            onBack={() => go('magazine')}
           />
         ) : null;
 
