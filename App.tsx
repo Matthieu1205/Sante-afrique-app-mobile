@@ -244,24 +244,30 @@ function AppContent() {
           fetchMagazineIssueDetail(Number(issue.id)),
         ]);
 
-        // Priorité : URL signée > pdf_url (téléchargement auth) > read_url (page web)
         const pdfUrl  = detail?.pdf_url  ?? null;
         const readUrl = detail?.read_url ?? null;
-        const url = readerUrl ?? pdfUrl ?? readUrl ?? null;
 
-        if (url) {
-          if (url.toLowerCase().includes('.pdf')) {
-            // PDF → téléchargement avec Bearer token + ouverture native
-            await openMagazinePdf(url, authToken);
-          } else {
-            // Page web du magazine → WebView sans Bearer (le site gère sa propre auth)
-            go('legal', {
-              legalTitle: `Santé Afrique N°${issue.number}`,
-              legalUrl: url,
-              legalHideChrome: true,
-              legalRequiresAuth: false,
-            });
-          }
+        if (readerUrl) {
+          // reader-url = toujours une URL de lecture PDF (signée ou directe)
+          // → téléchargement + ouverture native, quelle que soit l'extension
+          await openMagazinePdf(readerUrl, authToken);
+          return;
+        }
+
+        if (pdfUrl) {
+          // Fichier PDF direct depuis le détail
+          await openMagazinePdf(pdfUrl, authToken);
+          return;
+        }
+
+        if (readUrl) {
+          // Page web du magazine → WebView (pas de Bearer, le site gère sa propre auth)
+          go('legal', {
+            legalTitle: `Santé Afrique N°${issue.number}`,
+            legalUrl: readUrl,
+            legalHideChrome: true,
+            legalRequiresAuth: false,
+          });
           return;
         }
       }
