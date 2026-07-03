@@ -11,6 +11,7 @@ import {
   getPushToken,
 } from './src/services/notifications';
 import { getAuthToken, logoutUser, fetchUserProfile, fetchMagazineReaderUrl, fetchMagazineIssueDetail, PROFILE_UNAUTHORIZED } from './src/services/api';
+import { openMagazinePdf } from './src/utils/openPdf';
 import type { UserProfile } from './src/services/api';
 import { Feather } from '@expo/vector-icons';
 
@@ -241,12 +242,18 @@ function AppContent() {
         }
 
         if (url) {
-          go('legal', {
-            legalTitle: `Santé Afrique N°${issue.number}`,
-            legalUrl: url,
-            legalHideChrome: true,
-            legalRequiresAuth: true,
-          });
+          if (url.toLowerCase().includes('.pdf')) {
+            // PDF protégé → téléchargement local + ouverture native
+            await openMagazinePdf(url, authToken);
+          } else {
+            // Page web du magazine → WebView
+            go('legal', {
+              legalTitle: `Santé Afrique N°${issue.number}`,
+              legalUrl: url,
+              legalHideChrome: true,
+              legalRequiresAuth: true,
+            });
+          }
           return;
         }
       } finally {
