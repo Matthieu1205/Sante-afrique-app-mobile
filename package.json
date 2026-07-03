@@ -12,6 +12,7 @@
     "@expo-google-fonts/inter": "^0.2.3",
     "@expo-google-fonts/nunito": "^0.2.3",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "deprecated-react-native-prop-types": "^5.0.0",
     "expo": "~54.0.0",
     "expo-asset": "~12.0.13",
     "expo-constants": "~18.0.13",
