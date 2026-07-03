@@ -516,7 +516,16 @@ function AppContent() {
           />
         );
 
-      case 'magazine-issue':
+      case 'magazine-issue': {
+        // Si connecté mais profil pas encore chargé → attendre avant de juger l'abonnement
+        if (isLoggedIn && !userProfile) {
+          loadProfile();
+          return (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
+              <ActivityIndicator size="large" color="#1B9DD9" />
+            </View>
+          );
+        }
         return params?.issue ? (
           <MagazineIssueScreen
             issue={params.issue}
@@ -533,6 +542,7 @@ function AppContent() {
             })}
           />
         ) : null;
+      }
 
       case 'jobs':
         return (
