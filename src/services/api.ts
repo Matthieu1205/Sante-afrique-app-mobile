@@ -633,7 +633,7 @@ export async function fetchMagazineReaderUrl(id: number): Promise<string | null>
     if (!res.ok) { console.log('[reader-url] status:', res.status); return null; }
     const json = await res.json() as Record<string, unknown>;
     console.log('[reader-url] réponse complète:', JSON.stringify(json));
-    const url = (json['url'] ?? json['reader_url'] ?? json['read_url'] ?? null) as string | null;
+    const url = (json['url'] ?? json['reader_url'] ?? json['read_url'] ?? json['pdf_url'] ?? null) as string | null;
     console.log('[reader-url] url extraite:', url);
     return url;
   } catch {
