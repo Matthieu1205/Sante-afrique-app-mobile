@@ -630,9 +630,12 @@ export async function fetchMagazineReaderUrl(id: number): Promise<string | null>
     const res = await fetch(`${BASE}/magazine/issues/${id}/reader-url`, {
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) return null;
+    if (!res.ok) { console.log('[reader-url] status:', res.status); return null; }
     const json = await res.json() as Record<string, unknown>;
-    return (json['url'] ?? json['reader_url'] ?? json['read_url'] ?? null) as string | null;
+    console.log('[reader-url] réponse complète:', JSON.stringify(json));
+    const url = (json['url'] ?? json['reader_url'] ?? json['read_url'] ?? null) as string | null;
+    console.log('[reader-url] url extraite:', url);
+    return url;
   } catch {
     return null;
   }
