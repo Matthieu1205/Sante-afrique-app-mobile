@@ -855,11 +855,13 @@ export async function fetchUserProfile(): Promise<UserProfile | null | typeof PR
     }
     if (!res.ok) return null;
     const json = await res.json() as Record<string, unknown>;
+    console.log('[profile] réponse complète /user:', JSON.stringify(json));
     const raw = (json.data ?? json) as Record<string, unknown>;
     if (!raw?.id) return null;
 
     // Tente d'abord l'objet subscription dans /user
     const subInUser = (raw.subscription ?? raw.abonnement ?? raw.user_subscription ?? null) as Record<string, unknown> | null;
+    console.log('[profile] subscription dans /user:', JSON.stringify(subInUser));
     let subscription: UserProfile['subscription'] = null;
 
     if (subInUser && typeof subInUser === 'object' && (subInUser.expires_at !== undefined || subInUser.plan !== undefined)) {
@@ -869,8 +871,11 @@ export async function fetchUserProfile(): Promise<UserProfile | null | typeof PR
         expires_at: (subInUser.expires_at ?? subInUser.end_date ?? null) as string | null,
         is_active:  !!(subInUser.is_active ?? subInUser.active ?? subInUser.status === 'active'),
       };
+      console.log('[profile] subscription parsée:', JSON.stringify(subscription));
     } else {
+      console.log('[profile] pas de subscription dans /user → appel fetchUserSubscription');
       subscription = await fetchUserSubscription(token);
+      console.log('[profile] subscription depuis endpoint dédié:', JSON.stringify(subscription));
     }
     return {
       id:           raw.id as number,
