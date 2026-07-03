@@ -195,6 +195,8 @@ function AppContent() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
 
   const go = (screen: Screen, params?: NavState['params']) =>
@@ -228,6 +230,21 @@ function AppContent() {
     fetchUserProfile().then(setUserProfile);
     go(dest);
   };
+
+  // Charge le profil quand on navigue vers l'écran profile et qu'il est null
+  useEffect(() => {
+    if (nav.screen !== 'profile' || userProfile !== null) return;
+    setProfileLoading(true);
+    setProfileError(null);
+    fetchUserProfile().then((p) => {
+      setProfileLoading(false);
+      if (p) {
+        setUserProfile(p);
+      } else {
+        setProfileError('Impossible de charger le profil. Vérifiez votre connexion.');
+      }
+    });
+  }, [nav.screen]);
 
   const handleLogout = async () => {
     await logoutUser();
@@ -546,12 +563,39 @@ function AppContent() {
         );
 
       case 'profile':
-        if (!userProfile) {
-          // Profil pas encore chargé : on relance le fetch et on affiche un loader
-          fetchUserProfile().then((p) => { if (p) setUserProfile(p); });
+        if (profileLoading) {
           return (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
               <ActivityIndicator size="large" color="#1B9DD9" />
+            </View>
+          );
+        }
+        if (profileError || !userProfile) {
+          return (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', padding: 32 }}>
+              <Text style={{ fontFamily: 'System', fontSize: 16, color: '#374151', textAlign: 'center', marginBottom: 8 }}>
+                Impossible de charger le profil
+              </Text>
+              <Text style={{ fontFamily: 'System', fontSize: 13, color: '#6B7280', textAlign: 'center', marginBottom: 24 }}>
+                {profileError ?? 'Vérifiez votre connexion internet.'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setProfileError(null);
+                  setProfileLoading(true);
+                  fetchUserProfile().then((p) => {
+                    setProfileLoading(false);
+                    if (p) setUserProfile(p);
+                    else setProfileError('Toujours indisponible. Réessayez plus tard.');
+                  });
+                }}
+                style={{ backgroundColor: '#1B9DD9', borderRadius: 8, paddingHorizontal: 24, paddingVertical: 12, marginBottom: 12 }}
+              >
+                <Text style={{ color: '#fff', fontFamily: 'System', fontWeight: '600' }}>Réessayer</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => go('menu')}>
+                <Text style={{ color: '#6B7280', fontSize: 14 }}>Retour</Text>
+              </TouchableOpacity>
             </View>
           );
         }
