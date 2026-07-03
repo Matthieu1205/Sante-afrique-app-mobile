@@ -838,7 +838,9 @@ async function fetchUserSubscription(token: string): Promise<UserProfile['subscr
   return null;
 }
 
-export async function fetchUserProfile(): Promise<UserProfile | null> {
+export const PROFILE_UNAUTHORIZED = '__UNAUTHORIZED__' as const;
+
+export async function fetchUserProfile(): Promise<UserProfile | null | typeof PROFILE_UNAUTHORIZED> {
   try {
     const token = await AsyncStorage.getItem('auth_token');
     if (!token) { console.log('[profile] pas de token'); return null; }
@@ -846,6 +848,11 @@ export async function fetchUserProfile(): Promise<UserProfile | null> {
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
     });
     console.log('[profile] status HTTP:', res.status);
+    if (res.status === 401) {
+      console.log('[profile] token rejeté (401) → déconnexion nécessaire');
+      await AsyncStorage.removeItem('auth_token');
+      return PROFILE_UNAUTHORIZED;
+    }
     if (!res.ok) return null;
     const json = await res.json() as Record<string, unknown>;
     const raw = (json.data ?? json) as Record<string, unknown>;

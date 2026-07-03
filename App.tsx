@@ -10,7 +10,7 @@ import {
   getLastNotificationArticleId,
   getPushToken,
 } from './src/services/notifications';
-import { getAuthToken, logoutUser, fetchUserProfile } from './src/services/api';
+import { getAuthToken, logoutUser, fetchUserProfile, PROFILE_UNAUTHORIZED } from './src/services/api';
 import type { UserProfile } from './src/services/api';
 import { Feather } from '@expo/vector-icons';
 
@@ -202,18 +202,34 @@ function AppContent() {
   const go = (screen: Screen, params?: NavState['params']) =>
     setNav({ screen, params });
 
-  const refreshProfile = useCallback(() => {
-    getAuthToken().then((t) => {
-      if (t) fetchUserProfile().then(setUserProfile);
-    });
+  const handleLogout = useCallback(async () => {
+    await logoutUser();
+    setIsLoggedIn(false);
+    setAuthToken(null);
+    setUserProfile(null);
+    go('home');
   }, []);
+
+  // Helper centralisé : charge le profil et gère le 401 automatiquement
+  const loadProfile = useCallback(async () => {
+    const p = await fetchUserProfile();
+    if (p === PROFILE_UNAUTHORIZED) {
+      await handleLogout();
+      return;
+    }
+    if (p) setUserProfile(p);
+    return p;
+  }, [handleLogout]);
+
+  const refreshProfile = useCallback(() => {
+    getAuthToken().then((t) => { if (t) loadProfile(); });
+  }, [loadProfile]);
 
   // Vérifie l'expiration de l'abonnement à chaque chargement du profil
   useEffect(() => {
     if (userProfile?.subscription?.is_active && userProfile.subscription.expires_at) {
       checkAndNotifySubscriptionExpiry(userProfile.subscription.expires_at).then((created) => {
         if (created) {
-          // Une nouvelle notification d'expiration a été créée → met à jour le badge
           getStoredNotifications().then((notifs) => setUnreadCount(countUnread(notifs)));
         }
       });
@@ -224,10 +240,9 @@ function AppContent() {
     setIsLoggedIn(true);
     getAuthToken().then((t) => {
       setAuthToken(t);
-      // Re-envoie le token push avec le Bearer token pour lier au compte utilisateur
       if (t) getPushToken().then((pt) => { if (pt) sendPushTokenToServer(pt); });
     });
-    fetchUserProfile().then(setUserProfile);
+    loadProfile();
     go(dest);
   };
 
@@ -238,7 +253,9 @@ function AppContent() {
     setProfileError(null);
     fetchUserProfile().then((p) => {
       setProfileLoading(false);
-      if (p) {
+      if (p === PROFILE_UNAUTHORIZED) {
+        handleLogout();
+      } else if (p) {
         setUserProfile(p);
       } else {
         setProfileError('Impossible de charger le profil. Vérifiez votre connexion.');
@@ -246,19 +263,11 @@ function AppContent() {
     });
   }, [nav.screen]);
 
-  const handleLogout = async () => {
-    await logoutUser();
-    setIsLoggedIn(false);
-    setAuthToken(null);
-    setUserProfile(null);
-    go('home');
-  };
-
   useEffect(() => {
     getAuthToken().then((t) => {
       setIsLoggedIn(!!t);
       setAuthToken(t);
-      if (t) fetchUserProfile().then(setUserProfile);
+      if (t) loadProfile();
     });
 
     // 1. Badge initial depuis le store local
@@ -585,7 +594,8 @@ function AppContent() {
                   setProfileLoading(true);
                   fetchUserProfile().then((p) => {
                     setProfileLoading(false);
-                    if (p) setUserProfile(p);
+                    if (p === PROFILE_UNAUTHORIZED) { handleLogout(); }
+                    else if (p) setUserProfile(p);
                     else setProfileError('Toujours indisponible. Réessayez plus tard.');
                   });
                 }}
