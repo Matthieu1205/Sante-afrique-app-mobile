@@ -228,10 +228,16 @@ function AppContent() {
   }, [loadProfile]);
 
   const handleIssuePress = useCallback(async (issue: MagazineIssue) => {
-    const isSubscribed = userProfile?.subscription?.is_active ?? false;
-    if (isLoggedIn && isSubscribed) {
-      setIsOpeningReader(true);
-      try {
+    setIsOpeningReader(true);
+    try {
+      // Profil pas encore chargé → on attend avant de vérifier l'abonnement
+      let currentProfile = userProfile;
+      if (isLoggedIn && !currentProfile) {
+        currentProfile = (await loadProfile()) ?? null;
+      }
+
+      const isSubscribed = currentProfile?.subscription?.is_active ?? false;
+      if (isLoggedIn && isSubscribed) {
         // 1. Essaie l'URL signée authentifiée
         let url = await fetchMagazineReaderUrl(Number(issue.id));
 
@@ -243,10 +249,8 @@ function AppContent() {
 
         if (url) {
           if (url.toLowerCase().includes('.pdf')) {
-            // PDF protégé → téléchargement local + ouverture native
             await openMagazinePdf(url, authToken);
           } else {
-            // Page web du magazine → WebView
             go('legal', {
               legalTitle: `Santé Afrique N°${issue.number}`,
               legalUrl: url,
@@ -256,12 +260,14 @@ function AppContent() {
           }
           return;
         }
-      } finally {
-        setIsOpeningReader(false);
       }
+
+      // Non-abonné ou URL introuvable → écran de détail
+      go('magazine-issue', { issue });
+    } finally {
+      setIsOpeningReader(false);
     }
-    go('magazine-issue', { issue });
-  }, [isLoggedIn, userProfile]);
+  }, [isLoggedIn, userProfile, loadProfile, authToken]);
 
   // Vérifie l'expiration de l'abonnement à chaque chargement du profil
   useEffect(() => {
