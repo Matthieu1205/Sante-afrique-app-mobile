@@ -240,80 +240,384 @@ public function changePassword(Request $request)
 
 ---
 
-## 5. Magazine — Contenu réel (lecture)
+## 5. Magazine — Lecture PDF complète ⭐ PRIORITÉ
 
-**Problème :** L'app affiche la liste des magazines et le sommaire correctement, mais ne peut pas afficher le contenu réel du magazine. L'endpoint `GET /magazine/issues/{id}/reader-url` doit retourner une URL valide vers le contenu (PDF ou lecteur flipbook) en vérifiant l'abonnement.
+**Flux dans l'app :**
+1. L'utilisateur clique un magazine → écran natif `MagazineIssueScreen`
+2. L'abonné clique **LIRE (ABONNÉS)** → l'app appelle `GET /api/magazine/issues/{id}/reader-url` avec son Bearer token
+3. Le backend retourne une **URL signée temporaire** (30 min) vers le PDF
+4. L'app ouvre l'URL dans un WebView → lecture du PDF
 
-**Fichier :** `app/Http/Controllers/MagazineController.php`
+---
 
-### Route dans `routes/api.php`
+### 5.1 Migration
+
+**`database/migrations/xxxx_add_pdf_fields_to_magazine_issues_table.php`**
+
 ```php
-Route::middleware('auth:sanctum')->get('/magazine/issues/{id}/reader-url', [MagazineController::class, 'readerUrl']);
+Schema::table('magazine_issues', function (Blueprint $table) {
+    // Chemin relatif du PDF sur le disque privé
+    // Ex : "magazines/sante-afrique-n23.pdf"
+    $table->string('pdf_path')->nullable()->after('cover_url');
+
+    // URL de la page web du numéro sur le site
+    // Ex : "https://santeafrique.net/numeros/23"
+    $table->string('read_url')->nullable()->after('pdf_path');
+
+    // Extrait texte affiché sur l'écran du numéro (pas un JSON)
+    $table->text('extrait')->nullable()->after('read_url');
+
+    // Sommaire JSON : [{"page":4,"title":"Éditorial"},...]
+    $table->json('sommaire')->nullable()->after('extrait');
+});
 ```
 
-### Controller
-```php
-public function readerUrl(Request $request, $id)
-{
-    $issue = MagazineIssue::findOrFail($id);
-    $user  = $request->user();
+> ⚠️ Si `extrait` et `sommaire` existent déjà dans la table, retirer ces deux lignes.
 
-    // Vérification abonnement (sauf si numéro gratuit)
-    if (!$issue->is_free && !$user->hasActiveSubscription()) {
-        return response()->json([
-            'ok'      => false,
-            'locked'  => true,
-            'message' => 'Abonnement requis pour lire ce numéro.',
-        ], 403);
+```bash
+php artisan migrate
+```
+
+---
+
+### 5.2 Disque privé — `config/filesystems.php`
+
+```php
+'disks' => [
+    // ... disques existants ...
+
+    // Les PDFs ne sont JAMAIS accessibles via URL publique
+    'private' => [
+        'driver'     => 'local',
+        'root'       => storage_path('app/private'),
+        'visibility' => 'private',
+    ],
+],
+```
+
+```bash
+mkdir -p storage/app/private/magazines
+```
+
+---
+
+### 5.3 Modèle MagazineIssue
+
+**`app/Models/MagazineIssue.php`**
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
+
+class MagazineIssue extends Model
+{
+    protected $fillable = [
+        'number', 'label', 'title', 'theme',
+        'cover_url', 'pdf_path', 'read_url',
+        'price', 'free', 'date',
+        'extrait', 'sommaire',
+    ];
+
+    protected $casts = [
+        'free'     => 'boolean',
+        'sommaire' => 'array',  // JSON ↔ tableau PHP automatiquement
+        'date'     => 'date',
+    ];
+
+    /**
+     * Génère une URL signée temporaire vers le PDF (30 minutes).
+     * Retourne null si aucun PDF n'est uploadé.
+     */
+    public function getPdfSignedUrl(): ?string
+    {
+        if (!$this->pdf_path) return null;
+        if (!Storage::disk('private')->exists($this->pdf_path)) return null;
+
+        return URL::temporarySignedRoute(
+            'magazine.pdf.serve',
+            now()->addMinutes(30),
+            ['issue' => $this->id]
+        );
     }
 
-    // Option A : Le magazine est un PDF stocké sur le serveur
-    // Générer une URL signée temporaire (expire dans 2h)
-    $url = Storage::temporaryUrl(
-        "magazines/{$issue->pdf_file}",
-        now()->addHours(2)
-    );
-
-    // Option B : Le magazine est sur un service externe (Issuu, Calameo, FlipHTML5)
-    // Retourner directement l'URL du lecteur
-    // $url = $issue->reader_url; // URL déjà stockée en base
-
-    return response()->json([
-        'ok'  => true,
-        'url' => $url,
-        'type'=> 'pdf', // ou 'flipbook', 'webview'
-    ]);
+    /** URL de la page web du numéro (calculée si non renseignée). */
+    public function getWebUrl(): string
+    {
+        return $this->read_url ?? "https://santeafrique.net/numeros/{$this->number}";
+    }
 }
 ```
 
-### Réponse attendue par l'app
+---
+
+### 5.4 MagazineController — 4 méthodes
+
+**`app/Http/Controllers/Api/MagazineController.php`**
+
+```php
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\MagazineIssue;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
+
+class MagazineController extends Controller
+{
+    // GET /api/magazine/issues  —  public
+    public function index(): JsonResponse
+    {
+        $issues = MagazineIssue::orderByDesc('date')
+            ->select('id', 'number', 'label', 'title', 'theme',
+                     'cover_url', 'price', 'free', 'date')
+            ->get();
+
+        return response()->json(['data' => $issues]);
+    }
+
+    // GET /api/magazine/issues/{id}  —  public
+    // Retourne sommaire, extrait et read_url pour l'écran natif de l'app
+    public function show(MagazineIssue $issue): JsonResponse
+    {
+        return response()->json([
+            'ok'   => true,
+            'data' => [
+                'id'        => $issue->id,
+                'number'    => $issue->number,
+                'label'     => $issue->label,
+                'title'     => $issue->title,
+                'theme'     => $issue->theme,
+                'cover_url' => $issue->cover_url,
+                'price'     => $issue->price,
+                'free'      => $issue->free,
+                'date'      => $issue->date?->toDateString(),
+                'sommaire'  => $issue->sommaire ?? [],
+                'extrait'   => $issue->extrait,
+                'read_url'  => $issue->getWebUrl(),
+                'pdf_url'   => null,
+            ],
+        ]);
+    }
+
+    // GET /api/magazine/issues/{id}/reader-url  —  auth:sanctum + abonné actif
+    // Retourne une URL signée valable 30 min pour lire le PDF
+    public function readerUrl(Request $request, MagazineIssue $issue): JsonResponse
+    {
+        $user = $request->user();
+        $sub  = $user->subscription; // ← adapter au nom réel de la relation
+
+        // ⚠️ Adapter is_active et expires_at aux vrais noms de colonnes
+        if (!$sub || !$sub->is_active || $sub->expires_at < now()) {
+            return response()->json([
+                'ok'      => false,
+                'message' => 'Abonnement requis pour lire ce magazine.',
+            ], 403);
+        }
+
+        $signedUrl = $issue->getPdfSignedUrl();
+
+        if (!$signedUrl) {
+            return response()->json([
+                'ok'      => false,
+                'message' => "Le PDF de ce numéro n'est pas encore disponible.",
+            ], 404);
+        }
+
+        return response()->json([
+            'ok'   => true,
+            'data' => [
+                'pdf_url'    => $signedUrl,
+                'reader_url' => $signedUrl,
+                'expires_in' => 1800,
+            ],
+        ]);
+    }
+
+    // GET /magazine/pdf/{id}?expires=xxx&signature=xxx  —  route WEB signée
+    // Sert le PDF en inline sans Bearer token (signature dans l'URL)
+    public function servePdf(Request $request, MagazineIssue $issue): Response
+    {
+        abort_unless($request->hasValidSignature(), 403, 'Lien expiré ou invalide.');
+        abort_unless(
+            $issue->pdf_path && Storage::disk('private')->exists($issue->pdf_path),
+            404, 'PDF introuvable.'
+        );
+
+        return response()->file(Storage::disk('private')->path($issue->pdf_path), [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="sante-afrique-n' . $issue->number . '.pdf"',
+            'Cache-Control'       => 'private, max-age=1800',
+        ]);
+    }
+}
+```
+
+---
+
+### 5.5 Upload des PDFs (admin)
+
+**`app/Http/Controllers/Admin/MagazineAdminController.php`**
+
+```php
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\MagazineIssue;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+
+class MagazineAdminController extends Controller
+{
+    // POST /api/admin/magazine/{issue}/pdf
+    public function uploadPdf(Request $request, MagazineIssue $issue)
+    {
+        $request->validate(['pdf' => 'required|file|mimes:pdf|max:102400']);
+
+        if ($issue->pdf_path && Storage::disk('private')->exists($issue->pdf_path)) {
+            Storage::disk('private')->delete($issue->pdf_path);
+        }
+
+        $path = $request->file('pdf')->storeAs(
+            'magazines',
+            "sante-afrique-n{$issue->number}.pdf",
+            'private'
+        );
+
+        $issue->update(['pdf_path' => $path]);
+
+        return response()->json(['ok' => true, 'pdf_path' => $path]);
+    }
+
+    // DELETE /api/admin/magazine/{issue}/pdf
+    public function deletePdf(MagazineIssue $issue)
+    {
+        if ($issue->pdf_path) {
+            Storage::disk('private')->delete($issue->pdf_path);
+            $issue->update(['pdf_path' => null]);
+        }
+        return response()->json(['ok' => true]);
+    }
+}
+```
+
+---
+
+### 5.6 Routes
+
+**`routes/api.php`**
+
+```php
+use App\Http\Controllers\Api\MagazineController;
+use App\Http\Controllers\Admin\MagazineAdminController;
+
+Route::prefix('magazine')->group(function () {
+    Route::get('/issues',         [MagazineController::class, 'index']);
+    Route::get('/issues/{issue}', [MagazineController::class, 'show']);
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/issues/{issue}/reader-url', [MagazineController::class, 'readerUrl']);
+    });
+});
+
+// Admin (adapter 'admin' au middleware réel du projet)
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
+    Route::post('/magazine/{issue}/pdf',   [MagazineAdminController::class, 'uploadPdf']);
+    Route::delete('/magazine/{issue}/pdf', [MagazineAdminController::class, 'deletePdf']);
+});
+```
+
+**`routes/web.php`**
+
+```php
+use App\Http\Controllers\Api\MagazineController;
+
+// IMPORTANT : exclure du middleware CSRF
+Route::get('/magazine/pdf/{issue}', [MagazineController::class, 'servePdf'])
+     ->name('magazine.pdf.serve')
+     ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+```
+
+---
+
+### 5.7 Formats JSON exacts attendus par l'app
+
+> ⚠️ L'app lit exactement ces clés. Ne pas les renommer.
+
+**`GET /api/magazine/issues/{id}`**
 ```json
 {
   "ok": true,
-  "url": "https://storage.santeafrique.net/magazines/numero-42.pdf?signature=xxx&expires=xxx",
-  "type": "pdf"
+  "data": {
+    "id": 23, "number": 23,
+    "label": "Santé Afrique N°23 · Janvier 2024",
+    "title": "...", "theme": "...",
+    "free": false, "price": "3500",
+    "cover_url": "https://...",
+    "date": "2024-01-15",
+    "sommaire": [
+      { "page": 4,  "title": "Éditorial" },
+      { "page": 6,  "title": "Dossier principal" },
+      { "page": 18, "title": "Grand entretien" }
+    ],
+    "extrait": "Découvrez ce mois-ci notre dossier...",
+    "read_url": "https://santeafrique.net/numeros/23",
+    "pdf_url": null
+  }
 }
 ```
 
-### En cas de non-abonné
+**`GET /api/magazine/issues/{id}/reader-url`** (succès)
 ```json
 {
-  "ok": false,
-  "locked": true,
-  "message": "Abonnement requis pour lire ce numéro."
+  "ok": true,
+  "data": {
+    "pdf_url": "https://api.santeafrique.net/magazine/pdf/23?expires=xxx&signature=xxx",
+    "reader_url": "https://api.santeafrique.net/magazine/pdf/23?expires=xxx&signature=xxx",
+    "expires_in": 1800
+  }
 }
 ```
 
-### ⚠️ Points importants pour le magazine
-- Si le PDF est sur AWS S3 ou espace de stockage Laravel : utiliser `Storage::temporaryUrl()` avec expiration
-- Si le PDF est sur un service externe (Issuu etc.) : stocker l'URL dans la colonne `reader_url` du modèle `MagazineIssue`
-- Le champ `is_free` dans la table `magazine_issues` doit exister pour les numéros gratuits
-- L'app ouvre l'URL dans un WebView → l'URL doit être directement lisible (pas de redirect login)
+---
 
-### Modèle `MagazineIssue` — colonnes requises
+### 5.8 Renseigner read_url en BDD
+
+```sql
+UPDATE magazine_issues
+SET read_url = CONCAT('https://santeafrique.net/numeros/', number)
+WHERE read_url IS NULL;
 ```
-id, title, number, cover_url, pdf_file (ou reader_url),
-published_at, is_free, sommaire (JSON), price
+
+---
+
+### 5.9 Checklist magazine dans l'ordre
+
+- [ ] `php artisan migrate`
+- [ ] Ajouter le disque `private` dans `config/filesystems.php`
+- [ ] Mettre à jour le modèle `MagazineIssue`
+- [ ] Créer `MagazineController` (4 méthodes)
+- [ ] Créer `MagazineAdminController` (upload/delete)
+- [ ] Ajouter les routes dans `api.php` et `web.php`
+- [ ] Renseigner `read_url` pour chaque numéro en BDD
+- [ ] Uploader les PDFs via `POST /api/admin/magazine/{id}/pdf`
+- [ ] Tester : appeler `/reader-url` avec Bearer token → ouvrir `pdf_url` dans le navigateur → PDF doit s'afficher
+
+**Test rapide Tinker :**
+```php
+$issue = MagazineIssue::find(23);
+$issue->update(['pdf_path' => 'magazines/sante-afrique-n23.pdf']);
+echo $issue->getPdfSignedUrl(); // ouvrir cette URL dans le navigateur
 ```
 
 ---

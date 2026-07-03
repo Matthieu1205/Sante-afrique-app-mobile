@@ -10,7 +10,7 @@ import {
   getLastNotificationArticleId,
   getPushToken,
 } from './src/services/notifications';
-import { getAuthToken, logoutUser, fetchUserProfile, fetchMagazineReaderUrl, fetchMagazineIssueDetail, PROFILE_UNAUTHORIZED } from './src/services/api';
+import { getAuthToken, logoutUser, fetchUserProfile, PROFILE_UNAUTHORIZED } from './src/services/api';
 import type { UserProfile } from './src/services/api';
 import { Feather } from '@expo/vector-icons';
 
@@ -202,7 +202,6 @@ function AppContent() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [isOpeningReader, setIsOpeningReader] = useState(false);
 
   const go = (screen: Screen, params?: NavState['params']) =>
     setNav({ screen, params });
@@ -230,54 +229,9 @@ function AppContent() {
     getAuthToken().then((t) => { if (t) loadProfile(); });
   }, [loadProfile]);
 
-  const handleIssuePress = useCallback(async (issue: MagazineIssue) => {
-    setIsOpeningReader(true);
-    try {
-      // Profil pas encore chargé → on attend avant de vérifier l'abonnement
-      let currentProfile = userProfile;
-      if (isLoggedIn && !currentProfile) {
-        currentProfile = (await loadProfile()) ?? null;
-      }
-
-      const isSubscribed = currentProfile?.subscription?.is_active ?? false;
-      if (isLoggedIn && isSubscribed) {
-        // Récupère l'URL signée ET le détail en parallèle
-        const [readerUrl, detail] = await Promise.all([
-          fetchMagazineReaderUrl(Number(issue.id)),
-          fetchMagazineIssueDetail(Number(issue.id)),
-        ]);
-
-        const pdfUrl  = detail?.pdf_url  ?? null;
-        const readUrl = detail?.read_url ?? null;
-
-        const finalUrl = readerUrl ?? pdfUrl ?? null;
-        if (finalUrl) {
-          // Lecteur PDF intégré
-          go('magazine-pdf', {
-            pdfUrl: finalUrl,
-            pdfTitle: `Santé Afrique N°${issue.number}`,
-          });
-          return;
-        }
-
-        if (readUrl) {
-          // Fallback : page web du magazine
-          go('legal', {
-            legalTitle: `Santé Afrique N°${issue.number}`,
-            legalUrl: readUrl,
-            legalHideChrome: true,
-            legalRequiresAuth: false,
-          });
-          return;
-        }
-      }
-
-      // Non-abonné ou URL introuvable → écran de détail
-      go('magazine-issue', { issue });
-    } finally {
-      setIsOpeningReader(false);
-    }
-  }, [isLoggedIn, userProfile, loadProfile, authToken]);
+  const handleIssuePress = useCallback((issue: MagazineIssue) => {
+    go('magazine-issue', { issue });
+  }, []);
 
   // Vérifie l'expiration de l'abonnement à chaque chargement du profil
   useEffect(() => {
@@ -571,6 +525,14 @@ function AppContent() {
         );
 
       case 'magazine-issue': {
+        if (isLoggedIn && !userProfile) {
+          loadProfile();
+          return (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
+              <ActivityIndicator size="large" color="#1B9DD9" />
+            </View>
+          );
+        }
         return params?.issue ? (
           <MagazineIssueScreen
             issue={params.issue}
@@ -738,14 +700,6 @@ function AppContent() {
           onPress={(s) => go(s)}
         />
       )}
-      {isOpeningReader && (
-        <View style={styles.readerOverlay}>
-          <View style={styles.readerOverlayCard}>
-            <ActivityIndicator size="large" color="#1B9DD9" />
-            <Text style={styles.readerOverlayText}>Ouverture du magazine…</Text>
-          </View>
-        </View>
-      )}
     </View>
   );
 }
@@ -763,17 +717,4 @@ export default function App() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
-  readerOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  readerOverlayCard: {
-    backgroundColor: '#fff', borderRadius: 12,
-    paddingHorizontal: 32, paddingVertical: 24,
-    alignItems: 'center', gap: 14,
-  },
-  readerOverlayText: {
-    fontSize: 14, color: '#374151', fontFamily: 'Inter_400Regular',
-  },
 });

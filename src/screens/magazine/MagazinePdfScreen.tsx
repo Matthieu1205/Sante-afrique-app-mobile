@@ -6,11 +6,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   StatusBar,
-  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import Pdf from 'react-native-pdf';
+import WebView from 'react-native-webview';
 import { Colors, FontFamily, FontSize, Spacing } from '@/theme';
 
 interface MagazinePdfScreenProps {
@@ -20,8 +19,6 @@ interface MagazinePdfScreenProps {
   onBack: () => void;
 }
 
-const { width: W, height: H } = Dimensions.get('window');
-
 export const MagazinePdfScreen: React.FC<MagazinePdfScreenProps> = ({
   url,
   title,
@@ -29,15 +26,10 @@ export const MagazinePdfScreen: React.FC<MagazinePdfScreenProps> = ({
   onBack,
 }) => {
   const insets = useSafeAreaInsets();
-  const [page, setPage]   = useState(1);
-  const [total, setTotal] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const source = {
-    uri: url,
-    headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-    cache: true,
-  };
+  const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
 
   return (
     <View style={styles.root}>
@@ -45,55 +37,63 @@ export const MagazinePdfScreen: React.FC<MagazinePdfScreenProps> = ({
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing['2'] }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity
+          onPress={onBack}
+          style={styles.backBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <Feather name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
-        {total > 0 ? (
-          <Text style={styles.pageCount}>{page}/{total}</Text>
-        ) : (
-          <View style={{ width: 48 }} />
-        )}
+        <View style={{ width: 36 }} />
       </View>
 
-      {/* Lecteur PDF */}
-      {error ? (
-        <View style={styles.errorBox}>
-          <Feather name="alert-circle" size={40} color="#DC2626" />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={onBack} style={styles.errorBtn}>
-            <Text style={styles.errorBtnText}>Retour</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <Pdf
-          source={source}
-          style={styles.pdf}
-          onLoadComplete={(numberOfPages) => setTotal(numberOfPages)}
-          onPageChanged={(p) => setPage(p)}
-          onError={(err) => {
-            console.log('[MagazinePdf] erreur:', err);
-            setError('Impossible de charger ce magazine.\nVérifiez votre connexion.');
-          }}
-          renderActivityIndicator={() => (
-            <View style={styles.loader}>
-              <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={styles.loaderText}>Chargement du magazine…</Text>
-            </View>
-          )}
-          enablePaging
-          horizontal={false}
-          fitPolicy={0}
-          spacing={0}
-          trustAllCerts={false}
-        />
-      )}
+      {/* Corps */}
+      <View style={styles.body}>
+        {error ? (
+          <View style={styles.center}>
+            <Feather name="alert-circle" size={44} color="#DC2626" />
+            <Text style={styles.errorText}>
+              Impossible de charger ce magazine.{'\n'}Vérifiez votre connexion.
+            </Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={onBack}>
+              <Text style={styles.retryBtnText}>Retour</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <WebView
+              source={{ uri: url, headers }}
+              style={styles.webview}
+              originWhitelist={['*']}
+              scalesPageToFit
+              allowsInlineMediaPlayback
+              javaScriptEnabled={false}
+              onLoadStart={() => { setLoading(true); setError(false); }}
+              onLoadEnd={() => setLoading(false)}
+              onError={() => { setLoading(false); setError(true); }}
+              onHttpError={(e) => {
+                if (e.nativeEvent.statusCode >= 400) {
+                  setLoading(false);
+                  setError(true);
+                }
+              }}
+            />
+            {loading && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={styles.loadingText}>Chargement du magazine…</Text>
+              </View>
+            )}
+          </>
+        )}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#1A1A2E' },
+  root: { flex: 1, backgroundColor: '#0D1B2A' },
 
   header: {
     backgroundColor: Colors.primary,
@@ -103,7 +103,10 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing['3'],
     gap: Spacing['3'],
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  backBtn: {
+    width: 36, height: 36,
+    alignItems: 'center', justifyContent: 'center',
+  },
   headerTitle: {
     flex: 1,
     fontFamily: FontFamily.headingBold,
@@ -111,41 +114,43 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
   },
-  pageCount: {
-    width: 48,
-    fontFamily: FontFamily.bodyBold,
-    fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.75)',
-    textAlign: 'right',
+
+  body: { flex: 1, backgroundColor: '#fff' },
+
+  webview: { flex: 1 },
+
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
   },
-
-  pdf: { flex: 1, width: W, height: H },
-
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loaderText: {
+  loadingText: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.sm,
-    color: '#94A3B8',
+    color: '#64748B',
   },
 
-  errorBox: {
+  center: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
-    padding: Spacing['6'], gap: Spacing['4'],
+    padding: Spacing['6'], gap: 16,
   },
   errorText: {
     fontFamily: FontFamily.body,
     fontSize: FontSize.base,
-    color: '#94A3B8',
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 24,
   },
-  errorBtn: {
+  retryBtn: {
     backgroundColor: Colors.primary,
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
+    marginTop: 8,
   },
-  errorBtnText: {
+  retryBtnText: {
     fontFamily: FontFamily.bodyBold,
     fontSize: FontSize.sm,
     color: '#fff',
