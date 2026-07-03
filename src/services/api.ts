@@ -632,8 +632,12 @@ export async function fetchMagazineReaderUrl(id: number): Promise<string | null>
     });
     if (!res.ok) { console.log('[reader-url] status:', res.status); return null; }
     const json = await res.json() as Record<string, unknown>;
-    console.log('[reader-url] réponse complète:', JSON.stringify(json));
-    const url = (json['url'] ?? json['reader_url'] ?? json['read_url'] ?? json['pdf_url'] ?? null) as string | null;
+    // Déballe { data: {...} } si le backend wrappe la réponse
+    const payload = (json['data'] && typeof json['data'] === 'object'
+      ? json['data']
+      : json) as Record<string, unknown>;
+    // pdf_url en priorité (fichier PDF direct), puis les autres champs possibles
+    const url = (payload['pdf_url'] ?? payload['url'] ?? payload['reader_url'] ?? payload['read_url'] ?? null) as string | null;
     console.log('[reader-url] url extraite:', url);
     return url;
   } catch {
