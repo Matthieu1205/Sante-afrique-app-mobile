@@ -622,6 +622,53 @@ echo $issue->getPdfSignedUrl(); // ouvrir cette URL dans le navigateur
 
 ---
 
+### 5.10 Notification push — Nouveau magazine
+
+Quand un nouveau numéro est publié, envoyer une notification push à tous les tokens enregistrés via l'API Expo.
+
+> ⚠️ Le champ `"sound": "default"` est **obligatoire** — sans lui le téléphone ne sonne pas.
+
+```php
+// Dans MagazineController@store ou dans un Observer/Event après publication
+use Illuminate\Support\Facades\Http;
+
+private function sendMagazineNotification(MagazineIssue $issue): void
+{
+    $tokens = PushToken::pluck('token')->toArray();
+    if (empty($tokens)) return;
+
+    // Expo accepte max 100 tokens par requête
+    foreach (array_chunk($tokens, 100) as $chunk) {
+        $messages = array_map(fn($token) => [
+            'to'    => $token,
+            'title' => 'Nouveau magazine disponible 📖',
+            'body'  => "Le numéro {$issue->number} de Santé Afrique est en ligne.",
+            'sound' => 'default',   // ← obligatoire pour que le téléphone sonne
+            'data'  => [
+                'type' => 'magazine',   // l'app ouvre l'écran magazine
+            ],
+        ], $chunk);
+
+        Http::post('https://exp.host/--/api/v2/push/send', $messages);
+    }
+}
+```
+
+**Payload envoyé à Expo :**
+```json
+{
+  "to": "ExponentPushToken[xxxxxx]",
+  "title": "Nouveau magazine disponible 📖",
+  "body": "Le numéro 24 de Santé Afrique est en ligne.",
+  "sound": "default",
+  "data": {
+    "type": "magazine"
+  }
+}
+```
+
+---
+
 ## 6. Mise à jour du profil utilisateur
 
 **Fichier :** `app/Http/Controllers/UserController.php`
